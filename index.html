@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Startup Studio NSU — Посещаемость</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;500;600&display=swap');
+:root{--bg:#111113;--sf:#1a1a1e;--bd:#2a2a32;--pk:#e8197d;--pd:rgba(232,25,125,.12);--pg:rgba(232,25,125,.3);--wh:#fff;--mt:#5c5c78;--dn:#ff3355;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
+.bg-stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.bg-stars span{position:absolute;border-radius:50%;background:#fff;opacity:0;animation:twinkle var(--d,3s) var(--delay,0s) ease-in-out infinite;}
+@keyframes twinkle{0%,100%{opacity:0}50%{opacity:var(--op,.5)}}
+.neb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;opacity:.1;animation:ndrift 14s ease-in-out infinite;}
+.n1{width:600px;height:600px;background:var(--pk);top:-200px;right:-150px;}
+.n2{width:400px;height:400px;background:#4400bb;bottom:-150px;left:-100px;animation-direction:reverse;animation-duration:18s;}
+@keyframes ndrift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,25px)}}
+.screen{display:none;position:relative;z-index:10;min-height:100vh;}
+.screen.active{display:flex;}
+
+/* SETUP */
+#screen-setup{align-items:center;justify-content:center;padding:40px 20px;}
+.setup-card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:24px;}
+.s-brand{display:flex;align-items:center;gap:12px;}
+.s-brand-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:var(--pk);box-shadow:0 0 20px var(--pg);animation:breathe 3s ease-in-out infinite;}
+@keyframes breathe{0%,100%{box-shadow:0 0 16px var(--pg);}50%{box-shadow:0 0 36px var(--pg),0 0 60px var(--pd);}}
+.s-brand-txt{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:900;line-height:1.25;letter-spacing:.04em;}
+.s-brand-txt em{color:var(--pk);font-style:normal;}
+.setup-h{display:flex;flex-direction:column;gap:6px;}
+.setup-title{font-family:'Unbounded',sans-serif;font-size:clamp(26px,5vw,38px);font-weight:900;line-height:1.05;letter-spacing:-.03em;}
+.setup-sub{font-size:14px;color:var(--mt);line-height:1.5;}
+.fields{display:flex;flex-direction:column;gap:14px;}
+.field label{display:block;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mt);margin-bottom:7px;}
+input[type=text],input[type=number]{width:100%;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);font-family:'Inter',sans-serif;font-size:14px;padding:12px 16px;border-radius:10px;outline:none;transition:border-color .2s,box-shadow .2s;}
+input:focus{border-color:var(--pk);box-shadow:0 0 0 3px var(--pd);}
+input::placeholder{color:var(--mt);}
+.btn-go{width:100%;padding:15px;background:var(--pk);color:#fff;border:none;border-radius:10px;cursor:pointer;overflow:hidden;position:relative;font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;transition:transform .15s,box-shadow .2s;}
+.btn-go::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,transparent 55%);}
+.btn-go:hover{transform:translateY(-2px);box-shadow:0 10px 28px var(--pg);}
+.geo-row{display:flex;gap:8px;align-items:flex-end;}
+.geo-row .field{flex:1;margin:0;}
+.btn-geo{padding:12px 14px;background:var(--sf);border:1.5px solid var(--bd);color:var(--pk);border-radius:10px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;transition:border-color .2s,background .2s;}
+.btn-geo:hover{border-color:var(--pk);background:var(--pd);}
+.geo-status{font-size:11px;margin-top:6px;color:var(--mt);display:flex;align-items:center;gap:6px;}
+.geo-status.ok{color:#3ecf8e;}
+.geo-status.err{color:var(--dn);}
+.geo-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.geo-section{background:var(--pd);border:1px solid rgba(232,25,125,.2);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.geo-section-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--pk);}
+.geo-radius-row{display:flex;align-items:center;gap:10px;}
+.geo-radius-row label{font-size:11px;color:var(--mt);white-space:nowrap;}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:var(--bd);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--pk);cursor:pointer;box-shadow:0 0 8px var(--pg);}
+.radius-val{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;color:var(--pk);white-space:nowrap;min-width:44px;}
+
+/* TEACHER — 3-row grid */
+#screen-teacher{flex-direction:column;align-items:stretch;}
+.tl{display:grid;grid-template-rows:64px 1fr 52px;height:100vh;max-width:1100px;width:100%;margin:0 auto;padding:0 48px;}
+
+.topbar{display:flex;align-items:center;border-bottom:1px solid var(--bd);gap:20px;}
+.tb-brand{display:flex;align-items:center;gap:9px;margin-right:auto;}
+.tb-dot{width:10px;height:10px;border-radius:50%;background:var(--pk);box-shadow:0 0 8px var(--pg);}
+.tb-name{font-family:'Unbounded',sans-serif;font-size:10px;font-weight:900;letter-spacing:.06em;opacity:.45;}
+.tb-name em{color:var(--pk);font-style:normal;opacity:1;}
+.live-pill{display:flex;align-items:center;gap:7px;background:var(--pd);border:1px solid rgba(232,25,125,.25);border-radius:100px;padding:5px 14px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--pk);}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--pk);animation:bl 1.4s ease-in-out infinite;}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
+.tb-subject{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;letter-spacing:-.01em;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* main 2-col — QR dominant */
+.t-main{display:grid;grid-template-columns:1fr 300px;gap:32px;align-items:start;padding:24px 0;}
+
+/* QR col */
+.qr-col{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.qr-card{background:var(--sf);border:1.5px solid var(--bd);border-radius:24px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:18px;position:relative;box-shadow:0 0 80px rgba(232,25,125,.08);width:100%;}
+.qr-card .br{position:absolute;width:18px;height:18px;border-color:var(--pk);border-style:solid;opacity:.5;}
+.qr-card .br.tl{top:12px;left:12px;border-width:2px 0 0 2px;border-radius:3px 0 0 0;}
+.qr-card .br.tr{top:12px;right:12px;border-width:2px 2px 0 0;border-radius:0 3px 0 0;}
+.qr-card .br.bl{bottom:12px;left:12px;border-width:0 0 2px 2px;border-radius:0 0 0 3px;}
+.qr-card .br.br2{bottom:12px;right:12px;border-width:0 2px 2px 0;border-radius:0 0 3px 0;}
+.qr-frame{background:#fff;padding:12px;border-radius:12px;position:relative;box-shadow:0 8px 40px rgba(0,0,0,.4),0 0 0 3px #000;width:min(520px,calc(100vw - 400px));height:min(520px,calc(100vw - 400px));display:flex;align-items:center;justify-content:center;}
+#qrcanvas{display:block;width:100%!important;height:100%!important;}
+.qr-hint{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mt);text-align:center;}
+.timer-b{width:100%;}
+.timer-track{width:100%;height:5px;background:var(--bd);border-radius:3px;overflow:hidden;margin-bottom:9px;}
+.timer-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--pk),#ff79b0);transition:width 1s linear,background .35s;}
+.timer-fill.urg{background:linear-gradient(90deg,#ff3355,#ff8044);}
+.timer-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mt);}
+.timer-n{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:900;color:var(--pk);line-height:1;transition:color .3s;}
+.timer-n.urg{color:var(--dn);}
+
+/* info col */
+.info-col{display:flex;flex-direction:column;gap:16px;}
+.info-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chip{background:var(--sf);border:1.5px solid var(--bd);border-radius:14px;padding:18px 20px;}
+.chip-lbl{font-size:9px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mt);margin-bottom:6px;}
+.chip-val{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;line-height:1.3;}
+.steps-c{background:var(--sf);border:1.5px solid var(--bd);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;}
+.steps-ttl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mt);}
+.step{display:flex;align-items:flex-start;gap:12px;}
+.step-n{width:22px;height:22px;flex-shrink:0;border-radius:50%;background:var(--pd);border:1px solid rgba(232,25,125,.25);display:flex;align-items:center;justify-content:center;font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;color:var(--pk);}
+.step-t{font-size:13px;color:var(--mt);line-height:1.55;padding-top:2px;}
+
+.t-foot{border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
+.foot-note{font-size:11px;color:var(--mt);}
+
+@media(max-width:780px){
+  .tl{padding:0 16px;grid-template-rows:auto 1fr auto;height:auto;}
+  .topbar{padding:14px 0;flex-wrap:wrap;border:none;gap:10px;}
+  .t-main{grid-template-columns:1fr;padding:16px 0;gap:16px;}
+  .qr-frame{width:calc(100vw - 60px)!important;height:calc(100vw - 60px)!important;}
+  .info-row{grid-template-columns:1fr 1fr;}
+  .t-foot{padding:12px 0;flex-direction:column;gap:6px;align-items:flex-start;}
+}
+
+/* STUDENT */
+#screen-student{align-items:center;justify-content:center;padding:40px 20px;flex-direction:column;gap:0;}
+.st-brand{display:flex;align-items:center;gap:9px;margin-bottom:28px;}
+.st-bd{width:12px;height:12px;border-radius:50%;background:var(--pk);box-shadow:0 0 12px var(--pg);}
+.st-bn{font-family:'Unbounded',sans-serif;font-size:10px;font-weight:900;letter-spacing:.06em;}
+.st-card{width:90%;max-width:360px;background:var(--sf);border:1.5px solid var(--bd);border-radius:24px;padding:44px 32px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px;position:relative;overflow:hidden;}
+.st-card.ok::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(232,25,125,.1),transparent 65%);pointer-events:none;}
+.st-icon{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;margin-bottom:4px;}
+.st-icon.ok{background:var(--pd);border:2px solid rgba(232,25,125,.4);box-shadow:0 0 36px var(--pd);animation:popIn .45s cubic-bezier(.175,.885,.32,1.275) forwards;}
+.st-icon.fail{background:rgba(255,51,85,.08);border:2px solid rgba(255,51,85,.3);animation:shake .5s ease forwards;}
+.st-icon.spin{background:#1e1e24;border:2px solid var(--bd);}
+@keyframes popIn{0%{transform:scale(.4) rotate(-10deg);opacity:0}70%{transform:scale(1.08) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px) rotate(-2deg)}40%{transform:translateX(9px) rotate(2deg)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.spin-r{width:30px;height:30px;border:3px solid rgba(232,25,125,.15);border-top-color:var(--pk);border-radius:50%;animation:rot .75s linear infinite;}
+@keyframes rot{100%{transform:rotate(360deg)}}
+.st-title{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:900;letter-spacing:-.02em;}
+.st-title.spin{color:var(--mt);font-size:15px;}
+.st-desc{font-size:13px;color:var(--mt);line-height:1.6;max-width:260px;}
+.st-sep{width:36px;height:1px;background:var(--bd);}
+.st-tag{padding:5px 14px;border-radius:100px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;}
+.st-tag.ok{background:var(--pd);color:var(--pk);border:1px solid rgba(232,25,125,.25);}
+.st-tag.fail{background:rgba(255,51,85,.08);color:var(--dn);border:1px solid rgba(255,51,85,.2);}
+.st-pb{width:100%;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.st-pf{height:100%;width:0;background:linear-gradient(90deg,var(--pk),#ff79b0);border-radius:2px;transition:width 3s linear;}
+</style>
+</head>
+<body>
+<div class="bg-stars" id="bg-stars"></div>
+<div class="neb n1"></div>
+<div class="neb n2"></div>
+
+<!-- SETUP -->
+<div class="screen active" id="screen-setup">
+  <div class="setup-card">
+    <div class="s-brand">
+      <div class="s-brand-dot"></div>
+      <div class="s-brand-txt">STARTUP<br>STUDIO <em>NSU</em></div>
+    </div>
+    <div class="setup-h">
+      <div class="setup-title">Отметить<br>посещаемость</div>
+      <div class="setup-sub">Введите данные занятия и запустите сессию.</div>
+    </div>
+    <div class="fields">
+      <div class="field">
+        <label>Предмет / Группа</label>
+        <input type="text" id="inp-subject" placeholder="Стартап-менеджмент, ИТ-21" />
+      </div>
+      <div class="field">
+        <label>Ссылка на Google Forms</label>
+        <input type="text" id="inp-forms" placeholder="https://docs.google.com/forms/..." />
+      </div>
+      <div class="field">
+        <label>Обновлять QR каждые (сек)</label>
+        <input type="number" id="inp-interval" value="15" min="5" max="120" />
+      </div>
+
+      <div class="geo-section">
+        <div class="geo-section-lbl">📍 Геолокация аудитории</div>
+        <div class="geo-row">
+          <div class="field">
+            <label>Координаты аудитории</label>
+            <input type="text" id="inp-geo" placeholder="54.8442, 83.0905" readonly />
+          </div>
+          <button class="btn-geo" onclick="captureGeo()" title="Определить моё местоположение">⊕</button>
+        </div>
+        <div class="geo-status" id="geo-status"><span class="geo-dot"></span>Не задано — геозащита отключена</div>
+        <div class="geo-radius-row">
+          <label>Допустимый радиус:</label>
+          <input type="range" id="inp-radius" min="20" max="300" value="80" step="10" oninput="document.getElementById('radius-val').textContent=this.value+'м'"/>
+          <span class="radius-val" id="radius-val">80м</span>
+        </div>
+      </div>
+    </div>
+    <button class="btn-go" onclick="startSession()">ЗАПУСТИТЬ СЕССИЮ →</button>
+  </div>
+</div>
+
+<!-- TEACHER -->
+<div class="screen" id="screen-teacher">
+  <div class="tl">
+    <div class="topbar">
+      <div class="tb-brand">
+        <div class="tb-dot"></div>
+        <div class="tb-name">STARTUP STUDIO <em>NSU</em></div>
+      </div>
+      <div class="live-pill"><div class="live-dot"></div>Live</div>
+      <div class="tb-subject" id="lbl-subject">—</div>
+    </div>
+    <div class="t-main">
+      <div class="qr-col">
+        <div class="qr-card">
+          <div class="br tl"></div><div class="br tr"></div>
+          <div class="br bl"></div><div class="br br2"></div>
+          <div class="qr-frame"><canvas id="qrcanvas"></canvas></div>
+          <div class="qr-hint">Наведи камеру и отметись</div>
+          <div class="timer-b">
+            <div class="timer-track"><div class="timer-fill" id="t-fill"></div></div>
+            <div class="timer-row">
+              <span>Код обновится через</span>
+              <span class="timer-n" id="t-cd">15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info-col">
+        <div class="info-row">
+          <div class="chip">
+            <div class="chip-lbl">Обновление</div>
+            <div class="chip-val" id="info-ivl">15 сек</div>
+          </div>
+          <div class="chip">
+            <div class="chip-lbl">Защита</div>
+            <div class="chip-val" id="info-geo">Fingerprint</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="chip">
+            <div class="chip-lbl">Статус сессии</div>
+            <div class="chip-val" style="color:var(--pk);">Активна</div>
+          </div>
+          <div class="chip">
+            <div class="chip-lbl">Токен</div>
+            <div class="chip-val" id="info-tok" style="font-size:10px;letter-spacing:.05em;opacity:.6;">—</div>
+          </div>
+        </div>
+        <div class="steps-c">
+          <div class="steps-ttl">Как отметиться</div>
+          <div class="step"><div class="step-n">1</div><div class="step-t">Наведи камеру телефона на QR-код</div></div>
+          <div class="step"><div class="step-n">2</div><div class="step-t">Открой ссылку — страница проверит присутствие</div></div>
+          <div class="step"><div class="step-n">3</div><div class="step-t">Введите данные занятия в форме на экране</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="t-foot">
+      <div class="foot-note">Страница обновляет код автоматически — не закрывайте вкладку</div>
+      <div class="tb-brand" style="opacity:.3"><div class="tb-dot" style="box-shadow:none"></div><div class="tb-name">STARTUP STUDIO <em>NSU</em></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT -->
+<div class="screen" id="screen-student">
+  <div class="st-brand"><div class="st-bd"></div><div class="st-bn">STARTUP STUDIO NSU</div></div>
+  <div class="st-card" id="st-card">
+    <div class="st-icon spin"><div class="spin-r"></div></div>
+    <div class="st-title spin">Проверяем...</div>
+    <div class="st-desc">Секунду — идёт проверка кода</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const w=document.getElementById('bg-stars');
+  for(let i=0;i<100;i++){
+    const s=document.createElement('span');
+    s.style.left=Math.random()*100+'%';
+    s.style.top=Math.random()*100+'%';
+    const sz=Math.random()<.15?3:2;
+    s.style.width=sz+'px';s.style.height=sz+'px';
+    s.style.setProperty('--d',(2+Math.random()*4)+'s');
+    s.style.setProperty('--delay',(Math.random()*6)+'s');
+    s.style.setProperty('--op',(0.2+Math.random()*0.65).toFixed(2));
+    w.appendChild(s);
+  }
+})();
+
+// Robust URL param parsing — works on iOS Safari QR scanner (handles both ?search and #hash cases)
+function getParams(){
+  // iOS Safari QR sometimes delivers params in hash rather than search
+  const raw=location.search||'';
+  const hashRaw=location.hash.startsWith('#?')?location.hash.slice(1):'';
+  return new URLSearchParams(raw||hashRaw);
+}
+const P=getParams();
+const uT=P.get('t'),uF=P.get('f'),uE=parseInt(P.get('e')||'0');
+const uGl=P.get('gl'),uGn=P.get('gn'),uGr=P.get('gr'),uGa=P.get('ga');
+
+if(uT&&uF&&uE){show('screen-student');runCheck();}
+else{show('screen-setup');}
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+
+let cfg={},tLeft=15,ticker=null;
+
+function captureGeo(){
+  const st=document.getElementById('geo-status');
+  const inp=document.getElementById('inp-geo');
+  st.className='geo-status';
+  st.innerHTML='<span class="geo-dot"></span>Определяем координаты…';
+  if(!navigator.geolocation){
+    st.className='geo-status err';
+    st.innerHTML='<span class="geo-dot"></span>Геолокация не поддерживается браузером';
+    return;
+  }
+
+  // Try high-accuracy first (GPS on phone), fall back to network/IP after 8s
+  let resolved=false;
+
+  function applyPosition(pos){
+    if(resolved)return;
+    resolved=true;
+    const lat=pos.coords.latitude.toFixed(6);
+    const lng=pos.coords.longitude.toFixed(6);
+    const acc=Math.round(pos.coords.accuracy);
+    inp.value=`${lat}, ${lng}`;
+    inp.dataset.acc=acc;
+    const radSlider=document.getElementById('inp-radius');
+    const radVal=document.getElementById('radius-val');
+    // Radius = accuracy of THIS device + 80m margin for student's phone error
+    // This way even a 5000m wifi fix works: student also has ~50-100m phone GPS,
+    // and the teacher's 5000m accuracy is subtracted on student side too (via ga param)
+    const suggested=Math.min(300,Math.max(80,Math.round(acc*0.15)+80));
+    radSlider.value=suggested;
+    radVal.textContent=suggested+'м';
+    const accLabel=acc<50?'GPS':acc<500?'WiFi':'IP-геолокация';
+    const isUnreliable=acc>500;
+    st.className='geo-status '+(isUnreliable?'err':'ok');
+    if(isUnreliable){
+      st.innerHTML=`<span class="geo-dot"></span>⚠ ${accLabel}, ±${acc} м — геопроверка будет отключена (слишком низкая точность). Защита только по fingerprint.`;
+    } else {
+      st.innerHTML=`<span class="geo-dot"></span>Зафиксировано ✓ (${accLabel}, ±${acc} м → радиус ${suggested} м)`;
+    }
+  }
+
+  function onError(err){
+    if(resolved)return;
+    resolved=true;
+    st.className='geo-status err';
+    const msg=err.code===1
+      ?'Доступ запрещён. Разрешите геолокацию в настройках браузера, затем нажмите ⊕ снова.'
+      :err.code===3
+      ?'Нет ответа. Проверьте, что геолокация включена в системе.'
+      :'Геолокация недоступна на этом устройстве.';
+    st.innerHTML=`<span class="geo-dot"></span>${msg}`;
+  }
+
+  // First try: high accuracy (triggers GPS on mobile, proper permission prompt)
+  navigator.geolocation.getCurrentPosition(applyPosition, err=>{
+    if(err.code===1){onError(err);return;}
+    // Timeout/unavailable — retry with low accuracy (WiFi/IP, faster)
+    navigator.geolocation.getCurrentPosition(applyPosition, onError,
+      {timeout:10000,maximumAge:60000,enableHighAccuracy:false});
+  }, {timeout:8000,maximumAge:0,enableHighAccuracy:true});
+}
+
+// Auto-trigger geo request on setup screen load so browser shows permission prompt immediately
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!uT&&!uF){
+    // Small delay so page renders first, then trigger geo (required for iOS user-gesture rule bypass)
+    setTimeout(()=>{ if(navigator.geolocation) captureGeo(); },400);
+  }
+});
+
+function startSession(){
+  const subject=document.getElementById('inp-subject').value.trim()||'Занятие';
+  const forms=document.getElementById('inp-forms').value.trim();
+  const interval=parseInt(document.getElementById('inp-interval').value)||15;
+  const geoRaw=document.getElementById('inp-geo').value.trim();
+  const radius=parseInt(document.getElementById('inp-radius').value)||80;
+  if(!forms){alert('Введите ссылку на Google Forms');return;}
+  if(!forms.startsWith('http')){alert('Ссылка должна начинаться с https://');return;}
+  let geoLat=null,geoLng=null,geoTeacherAcc=0;
+  if(geoRaw){
+    const parts=geoRaw.split(',').map(s=>parseFloat(s.trim()));
+    const geoInp=document.getElementById('inp-geo');
+    const teacherAcc=parseInt(geoInp.dataset.acc||'0');
+    if(parts.length===2&&!isNaN(parts[0])&&!isNaN(parts[1])){geoLat=parts[0];geoLng=parts[1];geoTeacherAcc=teacherAcc;}
+  }
+  cfg={subject,forms,interval,geoLat,geoLng,radius,geoTeacherAcc:geoTeacherAcc||0};
+  document.getElementById('lbl-subject').textContent=subject;
+  document.getElementById('info-ivl').textContent=interval+' сек';
+  const geoChip=document.getElementById('info-geo');
+  if(geoChip)geoChip.textContent=(geoLat!==null)?`Geo + FP`:'Fingerprint';
+  show('screen-teacher');
+  genQR();startTimer();
+}
+
+function genToken(){
+  const a='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({length:14},()=>a[Math.floor(Math.random()*a.length)]).join('');
+}
+
+function genQR(){
+  const token=genToken();
+  const tok=document.getElementById('info-tok');
+  if(tok)tok.textContent=token.slice(0,8)+'…';
+  const expiry=Date.now()+cfg.interval*1000+5000;
+  const base=location.href.split('?')[0];
+  let url=`${base}?t=${token}&f=${encodeURIComponent(cfg.forms)}&e=${expiry}`;
+  if(cfg.geoLat!==null&&cfg.geoLng!==null){
+    const MAGIC=0x4E5355;
+    const la=((Math.round(cfg.geoLat*1e5))^MAGIC);
+    const ln=((Math.round(cfg.geoLng*1e5))^MAGIC);
+    const r=cfg.radius||100;
+    const ta=cfg.geoTeacherAcc||0; // teacher GPS accuracy in metres
+    url+=`&gl=${la}&gn=${ln}&gr=${r}&ga=${ta}`;
+  }
+  renderQR(url);
+}
+
+function renderQR(text){
+  const qr=qrcode(0,'M'); // Level M = 15% error correction — fewer modules = bigger cells = easier scan
+  qr.addData(text);qr.make();
+  const M=qr.getModuleCount();
+  const PAD=6; // quiet zone — bigger = more reliable scanning
+  const cv=document.getElementById('qrcanvas');
+  // Very high native resolution for crisp display on retina/4K
+  const NATIVE=1200;
+  cv.width=NATIVE;cv.height=NATIVE;
+  const DS=NATIVE/(M+PAD*2);
+  const frame=cv.parentElement;
+  const display=frame?Math.min(frame.clientWidth-16,frame.clientHeight-16)||480:480;
+  cv.style.width=display+'px';cv.style.height=display+'px';
+  const ctx=cv.getContext('2d');
+  // Pure white background
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,NATIVE,NATIVE);
+  // Pure black modules — no rounding, no colour, no logo
+  ctx.fillStyle='#000000';
+  for(let r=0;r<M;r++){
+    for(let c=0;c<M;c++){
+      if(qr.isDark(r,c)){
+        const x=(PAD+c)*DS;
+        const y=(PAD+r)*DS;
+        ctx.fillRect(Math.floor(x),Math.floor(y),Math.ceil(DS),Math.ceil(DS));
+      }
+    }
+  }
+}
+
+function startTimer(){
+  tLeft=cfg.interval;updTimer();
+  if(ticker)clearInterval(ticker);
+  ticker=setInterval(()=>{tLeft--;updTimer();if(tLeft<=0){genQR();tLeft=cfg.interval;}},1000);
+}
+function updTimer(){
+  const pct=(tLeft/cfg.interval)*100;
+  document.getElementById('t-fill').style.width=pct+'%';
+  document.getElementById('t-cd').textContent=tLeft;
+  const u=tLeft<=5;
+  document.getElementById('t-fill').classList.toggle('urg',u);
+  document.getElementById('t-cd').classList.toggle('urg',u);
+}
+
+// Haversine distance in metres between two lat/lng points
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000,toR=Math.PI/180;
+  const dLat=(lat2-lat1)*toR,dLng=(lng2-lng1)*toR;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Decode XOR-obfuscated geo param
+function decodeGeo(v){const MAGIC=0x4E5355;return((parseInt(v)^MAGIC)/1e5);}
+
+async function runCheck(){
+  const now=Date.now();
+  if(!uT||!uF||!uE)return showFail('✕','Неверная ссылка','Параметры повреждены. Отсканируйте QR заново.');
+  if(now>uE)return showFail('⏱','QR устарел','Код истёк. Отсканируйте свежий QR с проектора.');
+
+  // Step 1: Geo check (if geo params present)
+  if(uGl&&uGn&&uGr){
+    const tLat=decodeGeo(uGl),tLng=decodeGeo(uGn),tR=parseInt(uGr)||100;
+    const teacherAcc=parseInt(uGa||'0');
+    // If teacher used WiFi/IP (accuracy >500m), geo check is unreliable — skip silently
+    if(teacherAcc>500){
+      // Skip geo, proceed to fingerprint
+    } else {
+    try{
+      document.getElementById('st-card').innerHTML=`
+        <div class="st-icon spin"><div class="spin-r"></div></div>
+        <div class="st-title spin">Проверяем геолокацию…</div>
+        <div class="st-desc">Разрешите доступ к местоположению в браузере</div>`;
+      const pos=await new Promise((res,rej)=>
+        navigator.geolocation.getCurrentPosition(res,rej,{timeout:12000,maximumAge:0,enableHighAccuracy:true})
+      );
+      const dist=Math.round(haversine(pos.coords.latitude,pos.coords.longitude,tLat,tLng));
+      const phoneAcc=Math.round(pos.coords.accuracy||0);
+      // Subtract BOTH phone's and teacher's GPS accuracy from measured distance
+      const combinedAcc=phoneAcc+teacherAcc;
+      const effectiveDist=Math.max(0,dist-combinedAcc);
+      if(effectiveDist>tR){
+        return showFail('📍','Вы не в аудитории',
+          `Расстояние: ~${dist} м (GPS ±${phoneAcc}м). Допустимо: ${tR} м.`);
+      }
+    }catch(e){
+      const msg=e.code===1?'Доступ к геолокации запрещён. Разрешите в настройках браузера и попробуйте снова.':
+                e.code===3?'Геолокация не ответила вовремя. Попробуйте снова на улице или у окна.':
+                'Геолокация недоступна на вашем устройстве.';
+      return showFail('📍','Геолокация недоступна',msg);
+    }
+    } // end else (accurate geo check)
+  }
+
+  // Step 2: Fingerprint + token check
+  document.getElementById('st-card').innerHTML=`
+    <div class="st-icon spin"><div class="spin-r"></div></div>
+    <div class="st-title spin">Проверяем устройство…</div>
+    <div class="st-desc">Секунду — финальная проверка</div>`;
+  let fp='fb_'+navigator.userAgent+screen.width+screen.height;
+  try{
+    // Timeout wrapper — FingerprintJS can hang on iOS Safari; fall back to UA fingerprint after 4s
+    const fpResult=await Promise.race([
+      (async()=>{const r=await(await FingerprintJS.load()).get();return r.visitorId;})(),
+      new Promise(res=>setTimeout(()=>res(null),4000))
+    ]);
+    if(fpResult)fp=fpResult;
+  }catch(e){}
+  const used=getUsed(),dk='fp_'+fp;
+  if(used[dk]&&(now-used[dk].time<86400000))return showFail('⚠','Уже отмечен','С этого устройства посещаемость уже отмечена сегодня.');
+  if(used['tok_'+uT])return showFail('⚠','Код использован','Этот QR уже был использован с вашего устройства.');
+  used[dk]={token:uT,time:now};used['tok_'+uT]=now;
+  localStorage.setItem('att_used',JSON.stringify(used));
+  showOk(uF);
+}
+
+function showFail(icon,title,desc){
+  document.getElementById('st-card').innerHTML=`
+    <div class="st-icon fail">${icon}</div>
+    <div class="st-title">${title}</div>
+    <div class="st-sep"></div>
+    <div class="st-desc">${desc}</div>
+    <div class="st-tag fail">Отказано в доступе</div>`;
+}
+
+function showOk(formsUrl){
+  const c=document.getElementById('st-card');
+  c.classList.add('ok');
+  c.innerHTML=`
+    <div class="st-icon ok">✓</div>
+    <div class="st-title">Вы отмечены!</div>
+    <div class="st-sep"></div>
+    <div class="st-desc">Присутствие подтверждено. Сейчас откроется форма.</div>
+    <div class="st-tag ok">Подтверждено</div>
+    <div class="st-pb"><div class="st-pf" id="sp"></div></div>`;
+  requestAnimationFrame(()=>setTimeout(()=>{const p=document.getElementById('sp');if(p)p.style.width='100%';},60));
+  const embed=formsUrl.replace('?usp=header','').replace('usp=header&','').replace('usp=pp_url&','')+(formsUrl.includes('?')?'&embedded=true':'?embedded=true');
+  setTimeout(()=>{
+    document.getElementById('screen-student').innerHTML=`
+      <div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#111113;z-index:9999;">
+        <div style="background:#1a1a1e;border-bottom:1px solid #2a2a32;padding:11px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <div style="width:9px;height:9px;background:#e8197d;border-radius:50%;box-shadow:0 0 8px rgba(232,25,125,.6);animation:bl 1.4s infinite;"></div>
+          <span style="font-family:Unbounded,sans-serif;font-size:10px;font-weight:900;color:#fff;letter-spacing:.05em;">STARTUP STUDIO NSU</span>
+          <span style="font-size:11px;color:#5c5c78;margin-left:auto;">Форма посещаемости</span>
+        </div>
+        <iframe src="${embed}" style="flex:1;border:none;width:100%;background:#fff;"></iframe>
+      </div>
+      <style>@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
+  },3300);
+}
+
+function getUsed(){try{return JSON.parse(localStorage.getItem('att_used')||'{}')}catch{return{}}}
+</script>
+</body>
+</html>
