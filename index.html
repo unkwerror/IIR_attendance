@@ -105,6 +105,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .step-t{font-size:13px;color:var(--mt);line-height:1.55;padding-top:2px;}
 
 .t-foot{border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
+.btn-new-session{padding:9px 20px;background:transparent;border:1.5px solid var(--bd);color:var(--mt);border-radius:8px;cursor:pointer;font-family:'Unbounded',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;transition:border-color .2s,color .2s,background .2s;}
+.btn-new-session:hover{border-color:var(--pk);color:var(--pk);background:var(--pd);}
 .foot-note{font-size:11px;color:var(--mt);}
 
 @media(max-width:780px){
@@ -251,7 +253,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     </div>
     <div class="t-foot">
       <div class="foot-note">Страница обновляет код автоматически — не закрывайте вкладку</div>
-      <div class="tb-brand" style="opacity:.3"><div class="tb-dot" style="box-shadow:none"></div><div class="tb-name">STARTUP STUDIO <em>NSU</em></div></div>
+      <button class="btn-new-session" onclick="newSession()">↺ Новая сессия</button>
     </div>
   </div>
 </div>
@@ -447,6 +449,19 @@ function renderQR(text){
   }
 }
 
+function newSession(){
+  if(ticker)clearInterval(ticker);
+  show('screen-setup');
+  // Reset geo field so teacher can re-capture for new location if needed
+  const inp=document.getElementById('inp-geo');
+  const st=document.getElementById('geo-status');
+  // Keep coordinates but show re-capture hint
+  if(inp&&inp.value){
+    st.className='geo-status ok';
+    st.innerHTML='<span class="geo-dot"></span>Координаты сохранены с прошлой сессии. Нажмите ⊕ чтобы обновить.';
+  }
+}
+
 function startTimer(){
   tLeft=cfg.interval;updTimer();
   if(ticker)clearInterval(ticker);
@@ -529,9 +544,8 @@ async function runCheck(){
   // Key: session ID + fingerprint — allows one mark per session per device
   const sessionKey='sess_'+(uS||'nosess')+'_fp_'+fp;
   if(used[sessionKey])return showFail('⚠','Уже отмечен','Вы уже отметились на этом занятии. На следующей сессии можно будет отметиться снова.');
-  used[sessionKey]=now;
-  localStorage.setItem('att_used',JSON.stringify(used));
-  showOk(uF);
+  // Don't mark yet — only after student confirms form submission
+  showOk(uF, sessionKey);
 }
 
 function showFail(icon,title,desc){
@@ -543,30 +557,49 @@ function showFail(icon,title,desc){
     <div class="st-tag fail">Отказано в доступе</div>`;
 }
 
-function showOk(formsUrl){
-  const c=document.getElementById('st-card');
-  c.classList.add('ok');
-  c.innerHTML=`
-    <div class="st-icon ok">✓</div>
-    <div class="st-title">Вы отмечены!</div>
-    <div class="st-sep"></div>
-    <div class="st-desc">Присутствие подтверждено. Сейчас откроется форма.</div>
-    <div class="st-tag ok">Подтверждено</div>
-    <div class="st-pb"><div class="st-pf" id="sp"></div></div>`;
-  requestAnimationFrame(()=>setTimeout(()=>{const p=document.getElementById('sp');if(p)p.style.width='100%';},60));
-  const embed=formsUrl.replace('?usp=header','').replace('usp=header&','').replace('usp=pp_url&','')+(formsUrl.includes('?')?'&embedded=true':'?embedded=true');
-  setTimeout(()=>{
-    document.getElementById('screen-student').innerHTML=`
-      <div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#111113;z-index:9999;">
-        <div style="background:#1a1a1e;border-bottom:1px solid #2a2a32;padding:11px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
-          <div style="width:9px;height:9px;background:#e8197d;border-radius:50%;box-shadow:0 0 8px rgba(232,25,125,.6);animation:bl 1.4s infinite;"></div>
-          <span style="font-family:Unbounded,sans-serif;font-size:10px;font-weight:900;color:#fff;letter-spacing:.05em;">STARTUP STUDIO NSU</span>
-          <span style="font-size:11px;color:#5c5c78;margin-left:auto;">Форма посещаемости</span>
-        </div>
-        <iframe src="${embed}" style="flex:1;border:none;width:100%;background:#fff;"></iframe>
+function showOk(formsUrl, sessionKey){
+  // Clean up the forms URL (strip usp tracking params)
+  const cleanUrl=formsUrl
+    .replace(/[?&]usp=[^&]*/g,'')
+    .replace(/\?&/,'?')
+    .replace(/[?&]$/,'');
+
+  // Open form in new tab — Google Forms blocks iframes via X-Frame-Options
+  const tab=window.open(cleanUrl,'_blank');
+
+  // Show confirm screen on THIS page
+  const sc=document.getElementById('screen-student');
+  sc.innerHTML=`
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111113;z-index:9999;gap:20px;padding:40px 28px;text-align:center;">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;">
+        <div style="width:9px;height:9px;border-radius:50%;background:#e8197d;box-shadow:0 0 8px rgba(232,25,125,.6);"></div>
+        <span style="font-family:Unbounded,sans-serif;font-size:10px;font-weight:900;color:#fff;letter-spacing:.06em;">STARTUP STUDIO NSU</span>
       </div>
-      <style>@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
-  },3300);
+      <div style="width:72px;height:72px;border-radius:50%;background:rgba(232,25,125,.1);border:2px solid rgba(232,25,125,.35);display:flex;align-items:center;justify-content:center;font-size:28px;">📋</div>
+      <div style="font-family:Unbounded,sans-serif;font-size:20px;font-weight:900;color:#fff;line-height:1.2;">Форма открыта<br>в новой вкладке</div>
+      <div style="font-size:13px;color:#5c5c78;line-height:1.6;max-width:280px;">Заполните и отправьте форму, затем вернитесь сюда и нажмите кнопку ниже</div>
+      <div id="tab-warn" style="display:${tab?'none':'block'};font-size:12px;color:#ff6b6b;line-height:1.5;max-width:280px;">Браузер заблокировал новую вкладку. <a href="${cleanUrl}" target="_blank" style="color:#e8197d;text-decoration:underline;">Нажмите здесь чтобы открыть форму</a></div>
+      <button onclick="confirmSubmit('${sessionKey}')" style="margin-top:8px;padding:15px 32px;background:#e8197d;color:#fff;border:none;border-radius:12px;cursor:pointer;font-family:Unbounded,sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;box-shadow:0 8px 24px rgba(232,25,125,.35);">✓ Я отправил форму</button>
+      <div style="font-size:11px;color:#3a3a4a;">Нажмите только после отправки формы</div>
+    </div>
+    <style>@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
+}
+
+function confirmSubmit(sessionKey){
+  // Now write fingerprint — student is officially marked
+  const used=getUsed();
+  used[sessionKey]=Date.now();
+  localStorage.setItem('att_used',JSON.stringify(used));
+  // Replace the whole screen with success state
+  document.getElementById('screen-student').innerHTML=`
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111113;z-index:9999;gap:16px;padding:40px;">
+      <div style="width:80px;height:80px;border-radius:50%;background:rgba(232,25,125,.12);border:2px solid rgba(232,25,125,.4);display:flex;align-items:center;justify-content:center;font-size:34px;animation:popIn .45s cubic-bezier(.175,.885,.32,1.275) forwards;">✓</div>
+      <div style="font-family:Unbounded,sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em;">Вы отмечены!</div>
+      <div style="width:36px;height:1px;background:#2a2a32;"></div>
+      <div style="font-size:13px;color:#5c5c78;text-align:center;line-height:1.6;max-width:260px;">Присутствие подтверждено. Можно закрыть эту страницу.</div>
+      <div style="padding:5px 14px;border-radius:100px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:rgba(232,25,125,.12);color:#e8197d;border:1px solid rgba(232,25,125,.25);">Подтверждено</div>
+    </div>
+    <style>@keyframes popIn{0%{transform:scale(.4) rotate(-10deg);opacity:0}70%{transform:scale(1.08) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
 }
 
 function getUsed(){try{return JSON.parse(localStorage.getItem('att_used')||'{}')}catch{return{}}}
