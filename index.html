@@ -290,7 +290,7 @@ function getParams(){
   return new URLSearchParams(raw||hashRaw);
 }
 const P=getParams();
-const uT=P.get('t'),uF=P.get('f'),uE=parseInt(P.get('e')||'0');
+const uT=P.get('t'),uF=P.get('f'),uE=parseInt(P.get('e')||'0'),uS=P.get('s')||'';
 const uGl=P.get('gl'),uGn=P.get('gn'),uGr=P.get('gr'),uGa=P.get('ga');
 
 if(uT&&uF&&uE){show('screen-student');runCheck();}
@@ -377,6 +377,7 @@ function startSession(){
   const radius=parseInt(document.getElementById('inp-radius').value)||80;
   if(!forms){alert('Введите ссылку на Google Forms');return;}
   if(!forms.startsWith('http')){alert('Ссылка должна начинаться с https://');return;}
+  const sessionId=genToken(); // unique per session — fingerprint check keyed to this
   let geoLat=null,geoLng=null,geoTeacherAcc=0;
   if(geoRaw){
     const parts=geoRaw.split(',').map(s=>parseFloat(s.trim()));
@@ -384,7 +385,7 @@ function startSession(){
     const teacherAcc=parseInt(geoInp.dataset.acc||'0');
     if(parts.length===2&&!isNaN(parts[0])&&!isNaN(parts[1])){geoLat=parts[0];geoLng=parts[1];geoTeacherAcc=teacherAcc;}
   }
-  cfg={subject,forms,interval,geoLat,geoLng,radius,geoTeacherAcc:geoTeacherAcc||0};
+  cfg={subject,forms,interval,geoLat,geoLng,radius,geoTeacherAcc:geoTeacherAcc||0,sessionId};
   document.getElementById('lbl-subject').textContent=subject;
   document.getElementById('info-ivl').textContent=interval+' сек';
   const geoChip=document.getElementById('info-geo');
@@ -404,7 +405,7 @@ function genQR(){
   if(tok)tok.textContent=token.slice(0,8)+'…';
   const expiry=Date.now()+cfg.interval*1000+5000;
   const base=location.href.split('?')[0];
-  let url=`${base}?t=${token}&f=${encodeURIComponent(cfg.forms)}&e=${expiry}`;
+  let url=`${base}?t=${token}&f=${encodeURIComponent(cfg.forms)}&e=${expiry}&s=${cfg.sessionId}`;
   if(cfg.geoLat!==null&&cfg.geoLng!==null){
     const MAGIC=0x4E5355;
     const la=((Math.round(cfg.geoLat*1e5))^MAGIC);
@@ -524,10 +525,11 @@ async function runCheck(){
     ]);
     if(fpResult)fp=fpResult;
   }catch(e){}
-  const used=getUsed(),dk='fp_'+fp;
-  if(used[dk]&&(now-used[dk].time<86400000))return showFail('⚠','Уже отмечен','С этого устройства посещаемость уже отмечена сегодня.');
-  if(used['tok_'+uT])return showFail('⚠','Код использован','Этот QR уже был использован с вашего устройства.');
-  used[dk]={token:uT,time:now};used['tok_'+uT]=now;
+  const used=getUsed();
+  // Key: session ID + fingerprint — allows one mark per session per device
+  const sessionKey='sess_'+(uS||'nosess')+'_fp_'+fp;
+  if(used[sessionKey])return showFail('⚠','Уже отмечен','Вы уже отметились на этом занятии. На следующей сессии можно будет отметиться снова.');
+  used[sessionKey]=now;
   localStorage.setItem('att_used',JSON.stringify(used));
   showOk(uF);
 }
