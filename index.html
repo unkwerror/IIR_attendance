@@ -165,10 +165,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <label>Предмет / Группа</label>
         <input type="text" id="inp-subject" placeholder="Стартап-менеджмент, ИТ-21" />
       </div>
-      <div class="field">
-        <label>Ссылка на Google Forms</label>
-        <input type="text" id="inp-forms" placeholder="https://docs.google.com/forms/..." />
-      </div>
+      <!-- Раньше здесь была ссылка на Google Forms — теперь не нужна -->
       <div class="field">
         <label>Обновлять QR каждые (сек)</label>
         <input type="number" id="inp-interval" value="15" min="5" max="120" />
@@ -389,11 +386,9 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 async function startSession(){
   const subject=document.getElementById('inp-subject').value.trim()||'Занятие';
-  const forms=document.getElementById('inp-forms').value.trim();
   const interval=parseInt(document.getElementById('inp-interval').value)||15;
   const geoRaw=document.getElementById('inp-geo').value.trim();
   const radius=parseInt(document.getElementById('inp-radius').value)||80;
-  if(!forms){alert('Поле Google Forms больше не используется — можно вводить любой текст или оставить пустым.');}
   let geoLat=null,geoLng=null,geoTeacherAcc=0;
   if(geoRaw){
     const parts=geoRaw.split(',').map(s=>parseFloat(s.trim()));

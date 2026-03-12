@@ -61,8 +61,18 @@ async function appendAttendanceToSheet({ createdAt, studentName, studentGroup, s
   if (!client) return; // Sheets не настроены — просто выходим
   const { sheets, spreadsheetId } = client;
 
+  // Локальная дата (только день) в заданном часовом поясе
+  const tz = process.env.LOCAL_TZ || 'Asia/Novosibirsk';
+  const d = new Date(createdAt || Date.now());
+  const ymd = d.toLocaleString('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }); // формат YYYY-MM-DD
+
   const values = [[
-    new Date(createdAt || Date.now()).toISOString(), // дата
+    ymd, // дата
     studentName || '',
     studentGroup || '',
     sessionSubject || ''
@@ -321,13 +331,25 @@ app.post('/api/attendances', async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('begin');
-      const { rows: existRows } = await client.query(
+      // 1) защита по fingerprint
+      const { rows: existFp } = await client.query(
         `select 1 from attendances
           where session_id = $1 and fingerprint = $2
           limit 1`,
         [sessionId, fingerprint]
       );
-      if (existRows.length > 0) {
+      if (existFp.length > 0) {
+        await client.query('rollback');
+        return res.status(403).json({ error: 'already_marked' });
+      }
+      // 2) защита по ФИО+группа (если студент пытается отметиться со второго браузера)
+      const { rows: existStudent } = await client.query(
+        `select 1 from attendances
+          where session_id = $1 and lower(student_name) = lower($2) and lower(student_group) = lower($3)
+          limit 1`,
+        [sessionId, name, group]
+      );
+      if (existStudent.length > 0) {
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
