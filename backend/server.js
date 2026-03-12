@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import pkg from 'pg';
+import { google } from 'googleapis';
 
 dotenv.config();
 
@@ -21,6 +22,64 @@ const PORT = process.env.PORT || 4000;
 app.use(helmet());
 app.use(cors({ origin: '*'}));
 app.use(express.json());
+
+// === Google Sheets client (для учёта посещаемости в таблице) ===
+let sheetsClient = null;
+
+function getSheetsClient() {
+  if (sheetsClient) return sheetsClient;
+  const raw = process.env.GOOGLE_SHEETS_CREDENTIALS;
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!raw || !spreadsheetId) return null;
+
+  let creds;
+  try {
+    creds = JSON.parse(raw);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Invalid GOOGLE_SHEETS_CREDENTIALS JSON', e);
+    return null;
+  }
+
+  const jwt = new google.auth.JWT(
+    creds.client_email,
+    null,
+    creds.private_key,
+    ['https://www.googleapis.com/auth/spreadsheets']
+  );
+
+  sheetsClient = {
+    sheets: google.sheets({ version: 'v4', auth: jwt }),
+    spreadsheetId
+  };
+  return sheetsClient;
+}
+
+// Добавляем строку в Google Sheets: дата, ФИО, группа, мероприятие
+async function appendAttendanceToSheet({ createdAt, studentName, studentGroup, sessionSubject }) {
+  const client = getSheetsClient();
+  if (!client) return; // Sheets не настроены — просто выходим
+  const { sheets, spreadsheetId } = client;
+
+  const values = [[
+    new Date(createdAt || Date.now()).toISOString(), // дата
+    studentName || '',
+    studentGroup || '',
+    sessionSubject || ''
+  ]];
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'A:D',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values }
+    });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('append to Google Sheets error', e);
+  }
+}
 
 // Простая health‑проверка
 app.get('/health', (req, res) => {
@@ -229,6 +288,18 @@ app.post('/api/attendances', async (req, res) => {
   }
 
   try {
+    // Небольшой отдельный запрос, чтобы узнать subject сессии (для Google Sheets)
+    let sessionSubject = '';
+    try {
+      const { rows: sRows } = await pool.query(
+        'select subject from sessions where id = $1',
+        [sessionId]
+      );
+      if (sRows[0]) sessionSubject = sRows[0].subject || '';
+    } catch (e) {
+      // ignore, учёт в БД от этого не ломаем
+    }
+
     const { rows: tokRows } = await pool.query(
       `select token, session_id, expires_at, fingerprint
          from qr_tokens
@@ -273,6 +344,15 @@ app.post('/api/attendances', async (req, res) => {
 
       await client.query('commit');
       const a = insRows[0];
+
+      // Не блокируем ответ пользователю, если Google Sheets недоступны
+      appendAttendanceToSheet({
+        createdAt: a.created_at,
+        studentName: a.student_name,
+        studentGroup: a.student_group,
+        sessionSubject
+      }).catch(() => {});
+
       res.status(201).json({
         ok: true,
         attendance: {
