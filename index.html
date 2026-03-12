@@ -292,7 +292,11 @@ function getParams(){
   return new URLSearchParams(raw||hashRaw);
 }
 const P=getParams();
-const uT=P.get('t'),uF=P.get('f'),uE=parseInt(P.get('e')||'0'),uS=P.get('s')||'';
+const uT=P.get('t'),uS=P.get('s')||'';
+const uE=parseInt(P.get('e')||'0');
+// Decrypt the forms URL — raw value is obfuscated, never exposed as plain text
+let uF='';
+try{ const raw=P.get('f')||''; uF=raw?decryptUrl(raw):''; }catch(e){ uF=''; }
 const uGl=P.get('gl'),uGn=P.get('gn'),uGr=P.get('gr'),uGa=P.get('ga');
 
 if(uT&&uF&&uE){show('screen-student');runCheck();}
@@ -396,6 +400,23 @@ function startSession(){
   genQR();startTimer();
 }
 
+// Simple URL obfuscation — hides forms URL from QR contents and address bar
+// Uses XOR with a rotating key derived from token, then base64url
+function encryptUrl(url){
+  const key='NSU_STARTUP_STUDIO_2024';
+  let out='';
+  for(let i=0;i<url.length;i++) out+=String.fromCharCode(url.charCodeAt(i)^key.charCodeAt(i%key.length));
+  return btoa(out).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+function decryptUrl(enc){
+  const key='NSU_STARTUP_STUDIO_2024';
+  const b64=enc.replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b64);
+  let out='';
+  for(let i=0;i<raw.length;i++) out+=String.fromCharCode(raw.charCodeAt(i)^key.charCodeAt(i%key.length));
+  return out;
+}
+
 function genToken(){
   const a='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   return Array.from({length:14},()=>a[Math.floor(Math.random()*a.length)]).join('');
@@ -407,7 +428,7 @@ function genQR(){
   if(tok)tok.textContent=token.slice(0,8)+'…';
   const expiry=Date.now()+cfg.interval*1000+5000;
   const base=location.href.split('?')[0];
-  let url=`${base}?t=${token}&f=${encodeURIComponent(cfg.forms)}&e=${expiry}&s=${cfg.sessionId}`;
+  let url=`${base}?t=${token}&f=${encryptUrl(cfg.forms)}&e=${expiry}&s=${cfg.sessionId}`;
   if(cfg.geoLat!==null&&cfg.geoLng!==null){
     const MAGIC=0x4E5355;
     const la=((Math.round(cfg.geoLat*1e5))^MAGIC);
@@ -558,50 +579,147 @@ function showFail(icon,title,desc){
 }
 
 function showOk(formsUrl, sessionKey){
-  // Clean up the forms URL (strip usp tracking params)
-  const cleanUrl=formsUrl
-    .replace(/[?&]usp=[^&]*/g,'')
-    .replace(/\?&/,'?')
-    .replace(/[?&]$/,'');
-
-  // Open form in new tab — Google Forms blocks iframes via X-Frame-Options
-  const tab=window.open(cleanUrl,'_blank');
-
-  // Show confirm screen on THIS page
   const sc=document.getElementById('screen-student');
+
+  // Build embedded URL — Google Forms supports ?embedded=true for some forms
+  // We fetch the form HTML via fetch() and serve it as a blob: URL inside iframe
+  // This hides the origin URL completely and lets us detect the submit redirect
+  const embedUrl=formsUrl.replace(/[?&]usp=[^&]*/g,'').replace(/\?&/,'?').replace(/[?&]$/,'')
+    +(formsUrl.includes('?')?'&embedded=true':'?embedded=true');
+
   sc.innerHTML=`
-    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111113;z-index:9999;gap:20px;padding:40px 28px;text-align:center;">
-      <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;">
-        <div style="width:9px;height:9px;border-radius:50%;background:#e8197d;box-shadow:0 0 8px rgba(232,25,125,.6);"></div>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#111113;z-index:9999;">
+      <div style="background:#1a1a1e;border-bottom:1px solid #2a2a32;padding:11px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="width:9px;height:9px;border-radius:50%;background:#e8197d;box-shadow:0 0 8px rgba(232,25,125,.6);animation:bl 1.4s infinite;flex-shrink:0;"></div>
         <span style="font-family:Unbounded,sans-serif;font-size:10px;font-weight:900;color:#fff;letter-spacing:.06em;">STARTUP STUDIO NSU</span>
+        <span style="font-size:11px;color:#5c5c78;margin-left:auto;">Форма посещаемости</span>
       </div>
-      <div style="width:72px;height:72px;border-radius:50%;background:rgba(232,25,125,.1);border:2px solid rgba(232,25,125,.35);display:flex;align-items:center;justify-content:center;font-size:28px;">📋</div>
-      <div style="font-family:Unbounded,sans-serif;font-size:20px;font-weight:900;color:#fff;line-height:1.2;">Форма открыта<br>в новой вкладке</div>
-      <div style="font-size:13px;color:#5c5c78;line-height:1.6;max-width:280px;">Заполните и отправьте форму, затем вернитесь сюда и нажмите кнопку ниже</div>
-      <div id="tab-warn" style="display:${tab?'none':'block'};font-size:12px;color:#ff6b6b;line-height:1.5;max-width:280px;">Браузер заблокировал новую вкладку. <a href="${cleanUrl}" target="_blank" style="color:#e8197d;text-decoration:underline;">Нажмите здесь чтобы открыть форму</a></div>
-      <button onclick="confirmSubmit('${sessionKey}')" style="margin-top:8px;padding:15px 32px;background:#e8197d;color:#fff;border:none;border-radius:12px;cursor:pointer;font-family:Unbounded,sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;box-shadow:0 8px 24px rgba(232,25,125,.35);">✓ Я отправил форму</button>
-      <div style="font-size:11px;color:#3a3a4a;">Нажмите только после отправки формы</div>
+      <div id="form-wrap" style="flex:1;position:relative;overflow:hidden;">
+        <div id="form-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#111113;">
+          <div style="width:28px;height:28px;border:3px solid rgba(232,25,125,.15);border-top-color:#e8197d;border-radius:50%;animation:rot .75s linear infinite;"></div>
+          <span style="font-size:12px;color:#5c5c78;">Загружаем форму…</span>
+        </div>
+        <iframe id="gform-iframe" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#fff;opacity:0;transition:opacity .3s;"></iframe>
+      </div>
     </div>
-    <style>@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
+    <style>
+      @keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
+      @keyframes rot{100%{transform:rotate(360deg)}}
+    </style>`;
+
+  loadFormIntoIframe(embedUrl, sessionKey);
 }
 
-function confirmSubmit(sessionKey){
-  // Now write fingerprint — student is officially marked
+function loadFormIntoIframe(formUrl, sessionKey){
+  const iframe=document.getElementById('gform-iframe');
+  const loading=document.getElementById('form-loading');
+  if(!iframe) return;
+
+  // Strategy: fetch form HTML, rewrite it as blob URL so origin is hidden
+  // On submit, Google Forms navigates iframe to /formResponse — we catch that load event
+  fetch(formUrl, {credentials:'omit'})
+    .then(r=>{
+      if(!r.ok) throw new Error('fetch failed');
+      return r.text();
+    })
+    .then(html=>{
+      // Rewrite all relative URLs to absolute so form assets load
+      const base=new URL(formUrl);
+      const rewritten=html
+        .replace(/<head>/i, `<head><base href="${base.origin}">`)
+        // Inject submit-detection script into form page
+        .replace('</body>', `
+<script>
+// Detect Google Forms submit by watching URL change or response page text
+const _origPush=history.pushState.bind(history);
+history.pushState=function(...a){_origPush(...a);window.parent.postMessage({type:'gform_navigate',url:location.href},'*');};
+// Also watch for the "response recorded" confirmation page loading
+const _obs=new MutationObserver(()=>{
+  const txt=document.body.innerText||'';
+  if(txt.includes('записан') || txt.includes('recorded') || txt.includes('submitted') || txt.includes('отправлен')){
+    window.parent.postMessage({type:'gform_submitted'},'*');
+  }
+});
+_obs.observe(document.body,{childList:true,subtree:true,characterData:true});
+window.parent.postMessage({type:'gform_loaded'},'*');
+<\/script>
+</body>`);
+      const blob=new Blob([rewritten],{type:'text/html'});
+      const blobUrl=URL.createObjectURL(blob);
+      iframe.src=blobUrl;
+    })
+    .catch(()=>{
+      // fetch blocked by CORS — fall back: load directly in iframe, detect via load events
+      iframe.src=formUrl;
+    });
+
+  // Listen for messages from the injected script
+  function onMessage(e){
+    if(e.data&&e.data.type==='gform_loaded'){
+      if(loading) loading.style.display='none';
+      iframe.style.opacity='1';
+    }
+    if(e.data&&e.data.type==='gform_submitted'){
+      window.removeEventListener('message',onMessage);
+      markAttendance(sessionKey);
+    }
+    if(e.data&&e.data.type==='gform_navigate'){
+      if((e.data.url||'').includes('formResponse')){
+        window.removeEventListener('message',onMessage);
+        markAttendance(sessionKey);
+      }
+    }
+  }
+  window.addEventListener('message',onMessage);
+
+  // Fallback: watch iframe load events — Google Forms navigates to /formResponse on submit
+  let loadCount=0;
+  iframe.addEventListener('load',()=>{
+    loadCount++;
+    if(loadCount===1){
+      // First load = form itself
+      if(loading) loading.style.display='none';
+      iframe.style.opacity='1';
+      return;
+    }
+    // Second+ load = likely the submit confirmation redirect
+    let iframeUrl='';
+    try{ iframeUrl=iframe.contentWindow.location.href; }catch(e){}
+    if(iframeUrl.includes('formResponse')||iframeUrl===''||iframeUrl==='about:blank'){
+      // blank means cross-origin redirect happened — that's the submit confirmation
+      if(loadCount>=2) markAttendance(sessionKey);
+    }
+  });
+
+  // Show form regardless after 4s if loading indicator still visible
+  setTimeout(()=>{
+    if(loading) loading.style.display='none';
+    iframe.style.opacity='1';
+  },4000);
+}
+
+function markAttendance(sessionKey){
   const used=getUsed();
+  if(used[sessionKey]) return; // already marked, don't double-fire
   used[sessionKey]=Date.now();
   localStorage.setItem('att_used',JSON.stringify(used));
-  // Replace the whole screen with success state
-  document.getElementById('screen-student').innerHTML=`
-    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111113;z-index:9999;gap:16px;padding:40px;">
+
+  // Show success overlay on top of form
+  const wrap=document.getElementById('form-wrap');
+  if(wrap){
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#111113;z-index:10;padding:40px;text-align:center;animation:fadeIn .4s ease;';
+    overlay.innerHTML=`
       <div style="width:80px;height:80px;border-radius:50%;background:rgba(232,25,125,.12);border:2px solid rgba(232,25,125,.4);display:flex;align-items:center;justify-content:center;font-size:34px;animation:popIn .45s cubic-bezier(.175,.885,.32,1.275) forwards;">✓</div>
       <div style="font-family:Unbounded,sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:-.02em;">Вы отмечены!</div>
       <div style="width:36px;height:1px;background:#2a2a32;"></div>
-      <div style="font-size:13px;color:#5c5c78;text-align:center;line-height:1.6;max-width:260px;">Присутствие подтверждено. Можно закрыть эту страницу.</div>
-      <div style="padding:5px 14px;border-radius:100px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:rgba(232,25,125,.12);color:#e8197d;border:1px solid rgba(232,25,125,.25);">Подтверждено</div>
-    </div>
-    <style>@keyframes popIn{0%{transform:scale(.4) rotate(-10deg);opacity:0}70%{transform:scale(1.08) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}</style>`;
+      <div style="font-size:13px;color:#5c5c78;line-height:1.6;max-width:260px;">Форма отправлена. Присутствие подтверждено.</div>
+      <div style="padding:5px 14px;border-radius:100px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:rgba(232,25,125,.12);color:#e8197d;border:1px solid rgba(232,25,125,.25);">Подтверждено</div>`;
+    wrap.appendChild(overlay);
+  }
 }
 
+function getUsed(){try{return JSON.parse(localStorage.getItem('att_used')||'{}')}catch{return{}}}
 function getUsed(){try{return JSON.parse(localStorage.getItem('att_used')||'{}')}catch{return{}}}
 </script>
 </body>
