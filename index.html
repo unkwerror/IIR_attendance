@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="assets/css/main.css">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lottie-web@5/build/player/lottie.min.js"></script>
 <script src="assets/particles.js"></script>
 </head>
 <body>
@@ -15,11 +16,10 @@
 <div class="neb n2"></div>
 <canvas id="app-particles-canvas" class="app-particles-layer" aria-hidden="true"></canvas>
 
-<!-- Splash: тёмный фон, маленькое видео по центру, хаотичные частицы -->
+<!-- Splash: тёмный фон, частицы с загрузки, Lottie по центру -->
 <div id="screen-splash">
-  <canvas id="splash-particles-canvas" class="splash-particles-layer" aria-hidden="true"></canvas>
-  <div class="splash-video-box">
-    <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
+  <div class="splash-center">
+    <div id="splash-lottie" class="splash-lottie" aria-hidden="true"></div>
   </div>
   <div class="splash-progress"><div class="splash-progress-fill" id="splash-progress-fill"></div></div>
 </div>

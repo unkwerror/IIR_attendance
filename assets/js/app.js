@@ -32,10 +32,9 @@ function afterSplash() {
 
 function initSplash() {
   const splash = document.getElementById('screen-splash');
-  const video = document.getElementById('splash-video');
-  const videoBox = video && video.closest('.splash-video-box');
   const progressFill = document.getElementById('splash-progress-fill');
-  if (!splash || !video) {
+  const lottieEl = document.getElementById('splash-lottie');
+  if (!splash) {
     afterSplash();
     return;
   }
@@ -43,13 +42,24 @@ function initSplash() {
   const CROSSFADE_MS = 700;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
-  const splashParticles = window.startParticles && window.startParticles('splash-particles-canvas', 'slowChaotic');
+  let lottieInstance = null;
+  if (lottieEl && typeof lottie !== 'undefined') {
+    try {
+      lottieInstance = lottie.loadAnimation({
+        container: lottieEl,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: 'assets/lottie/animation.json'
+      });
+    } catch (e) {}
+  }
 
   let splashDismissed = false;
   function dismissSplash() {
     if (splashDismissed) return;
     splashDismissed = true;
-    if (splashParticles && splashParticles.cancel) splashParticles.cancel();
+    if (lottieInstance && lottieInstance.destroy) lottieInstance.destroy();
 
     const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
     show(target);
@@ -65,14 +75,7 @@ function initSplash() {
     }, CROSSFADE_MS);
   }
 
-  let videoEnded = false;
-  const safetyTimer = setTimeout(() => { if (!videoEnded) dismissSplash(); }, SPLASH_MS);
-  video.addEventListener('canplay', () => {
-    if (videoBox) videoBox.classList.add('ready');
-    video.play().catch(() => {});
-  });
-  video.addEventListener('ended', () => { videoEnded = true; clearTimeout(safetyTimer); dismissSplash(); });
-  video.addEventListener('error', () => {});
+  const safetyTimer = setTimeout(dismissSplash, SPLASH_MS);
 }
 
 function startAppParticlesOnce() {
