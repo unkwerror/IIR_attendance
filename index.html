@@ -40,7 +40,7 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
   opacity:0;
   transition:opacity .5s ease;
 }
-.splash-video.ready{opacity:1;}
+.splash-video.ready{opacity:0.15;}
 .splash-fallback{
   position:relative;z-index:2;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -547,16 +547,16 @@ function afterSplash(){
   window.addEventListener('resize',resizeCanvas);
   function spawnParticle(){
     var cx=window.innerWidth*0.5,cy=window.innerHeight*0.5;
-    return{x:cx+(Math.random()-0.5)*420,y:cy+(Math.random()-0.5)*280,vx:(Math.random()-0.5)*0.9,vy:-0.2-Math.random()*1,life:1,decay:0.005+Math.random()*0.01,size:1.2+Math.random()*2.8,hue:Math.random()<0.75?'232,25,125':'180,140,255'};
+    return{x:cx+(Math.random()-0.5)*480,y:cy+(Math.random()-0.5)*320,vx:(Math.random()-0.5)*0.8,vy:-0.15-Math.random()*0.9,life:1,decay:0.004+Math.random()*0.009,size:1+Math.random()*2.5,hue:'255,255,255'};
   }
-  for(var i=0;i<95;i++)particles.push(spawnParticle());
+  for(var i=0;i<110;i++)particles.push(spawnParticle());
   function drawParticles(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     particles.forEach(function(p,i){
       p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;
       if(p.life<=0)particles[i]=spawnParticle();
       ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-      ctx.fillStyle='rgba('+p.hue+','+p.life.toFixed(2)+')';ctx.fill();
+      ctx.fillStyle='rgba('+p.hue+','+(p.life*0.9).toFixed(2)+')';ctx.fill();
     });
     animId=requestAnimationFrame(drawParticles);
   }
@@ -570,7 +570,7 @@ function afterSplash(){
   }
   var videoEnded=false;
   var safetyTimer=setTimeout(function(){if(!videoEnded)dismissSplash();},SPLASH_MS);
-  video.addEventListener('canplay',function(){video.classList.add('ready');if(fallback)fallback.style.opacity='0';video.play().catch(function(){});});
+  video.addEventListener('canplay',function(){video.classList.add('ready');video.play().catch(function(){});});
   video.addEventListener('ended',function(){videoEnded=true;clearTimeout(safetyTimer);dismissSplash();});
   video.addEventListener('error',function(){});
 })();
