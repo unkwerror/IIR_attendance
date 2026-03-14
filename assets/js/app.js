@@ -22,10 +22,6 @@ function show(id) {
 }
 
 function afterSplash() {
-  if (!window._appParticlesStarted && window.startParticles) {
-    window._appParticlesStarted = true;
-    window.startParticles('app-particles-canvas', 'slowChaotic');
-  }
   if (uToken && uSession) {
     show('screen-student');
     runCheck();
@@ -42,24 +38,20 @@ function initSplash() {
     afterSplash();
     return;
   }
-  const splashParticlesController = window.startParticles && window.startParticles('splash-canvas', 'splash');
   const SPLASH_MS = 3400;
-  const CROSSFADE_MS = 800;
+  const CROSSFADE_MS = 700;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
   function dismissSplash() {
-    if (splashParticlesController && splashParticlesController.cancel) splashParticlesController.cancel();
     const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
     show(target);
     requestAnimationFrame(() => {
-      splash.classList.add('hide');
+      requestAnimationFrame(() => {
+        splash.classList.add('hide');
+      });
     });
     setTimeout(() => {
       splash.style.display = 'none';
-      if (!window._appParticlesStarted && window.startParticles) {
-        window._appParticlesStarted = true;
-        window.startParticles('app-particles-canvas', 'slowChaotic');
-      }
       if (target === 'screen-student') runCheck();
       else initTeacherEntry();
     }, CROSSFADE_MS);
@@ -70,6 +62,14 @@ function initSplash() {
   video.addEventListener('canplay', () => { video.classList.add('ready'); video.play().catch(() => {}); });
   video.addEventListener('ended', () => { videoEnded = true; clearTimeout(safetyTimer); dismissSplash(); });
   video.addEventListener('error', () => {});
+}
+
+function startAppParticlesOnce() {
+  if (window._appParticlesStarted || !window.startParticles) return;
+  window._appParticlesStarted = true;
+  requestAnimationFrame(() => {
+    window.startParticles('app-particles-canvas', 'slowChaotic');
+  });
 }
 
 function initStars() {
@@ -531,6 +531,7 @@ function startAttendancePolling() {
   attTimer = setInterval(load, 5000);
 }
 
+startAppParticlesOnce();
 initStars();
 initSplash();
 

@@ -15,10 +15,9 @@
 <div class="neb n2"></div>
 <canvas id="app-particles-canvas" class="app-particles-layer" aria-hidden="true"></canvas>
 
-<!-- Splash: чистая подложка + по центру анимация с белыми частицами -->
+<!-- Splash: overlay поверх общих частиц (app-particles-canvas уже рисуется с загрузки) -->
 <div id="screen-splash">
   <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
-  <canvas class="splash-particles" id="splash-canvas"></canvas>
   <div class="splash-fallback" id="splash-fallback">
     <div class="splash-orb"></div>
     <div class="splash-center-title">Startup Studio <em>NSU</em></div>
