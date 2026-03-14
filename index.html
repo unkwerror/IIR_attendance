@@ -43,7 +43,7 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 .splash-video.ready{opacity:1;}
 .splash-fallback{
   position:relative;z-index:2;
-  display:flex;flex-direction:column;align-items:flex-start;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:0;
   opacity:0;
   animation:splashFadeIn .6s ease .2s forwards;
@@ -51,48 +51,32 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 }
 @keyframes splashFadeIn{to{opacity:1;}}
 .splash-orb{
-  width:56px;height:56px;border-radius:50%;
+  width:44px;height:44px;border-radius:50%;
   background:var(--pk);
-  box-shadow:0 0 60px rgba(232,25,125,.8),0 0 120px rgba(232,25,125,.4);
-  margin-bottom:28px;
-  animation:splashOrb 1.4s cubic-bezier(.215,.61,.355,1) forwards;
+  box-shadow:0 0 40px rgba(232,25,125,.8),0 0 80px rgba(232,25,125,.4);
+  margin-bottom:16px;
+  animation:splashOrb 1.2s cubic-bezier(.215,.61,.355,1) forwards;
   transform:scale(0);
 }
 @keyframes splashOrb{
   0%{transform:scale(0);opacity:0;}
-  60%{transform:scale(1.12);}
+  60%{transform:scale(1.1);}
   100%{transform:scale(1);opacity:1;}
 }
-.splash-word{
+.splash-center-title{
   font-family:'Unbounded',sans-serif;
-  font-size:clamp(52px,11vw,110px);
-  font-weight:900;
-  line-height:.92;
-  letter-spacing:-.04em;
-  color:transparent;
-  -webkit-text-stroke:1.5px rgba(255,255,255,.9);
-  position:relative;
-  overflow:hidden;
-  clip-path:inset(0 100% 0 0);
-  animation:splashReveal .7s cubic-bezier(.77,0,.18,1) forwards;
+  font-size:clamp(14px,2.5vw,18px);
+  font-weight:700;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.85);
+  animation:splashTitleIn .8s cubic-bezier(.22,1,.36,1) .4s both;
 }
-.splash-word:nth-child(2){animation-delay:.12s;}
-.splash-word:nth-child(3){animation-delay:.22s;}
-.splash-word span{
-  position:absolute;inset:0;
-  color:#fff;
-  -webkit-text-stroke:0;
-  clip-path:inset(0 100% 0 0);
-  animation:splashFill .9s cubic-bezier(.77,0,.18,1) .6s forwards;
+@keyframes splashTitleIn{
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
 }
-@keyframes splashReveal{
-  0%{clip-path:inset(0 100% 0 0);}
-  100%{clip-path:inset(0 0% 0 0);}
-}
-@keyframes splashFill{
-  0%{clip-path:inset(0 100% 0 0);}
-  100%{clip-path:inset(0 0% 0 0);}
-}
+.splash-center-title em{color:var(--pk);font-style:normal;}
 .splash-particles{position:absolute;inset:0;z-index:1;pointer-events:none;}
 .splash-noise{
   position:absolute;inset:0;z-index:3;
@@ -320,9 +304,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div class="splash-noise"></div>
   <div class="splash-fallback" id="splash-fallback">
     <div class="splash-orb"></div>
-    <div class="splash-word">STARTUP<span>STARTUP</span></div>
-    <div class="splash-word">STUDIO<span>STUDIO</span></div>
-    <div class="splash-word">NSU<span>NSU</span></div>
+    <div class="splash-center-title">Startup Studio <em>NSU</em></div>
   </div>
   <div class="splash-corner tl"></div>
   <div class="splash-corner tr"></div>
@@ -565,9 +547,9 @@ function afterSplash(){
   window.addEventListener('resize',resizeCanvas);
   function spawnParticle(){
     var cx=window.innerWidth*0.5,cy=window.innerHeight*0.5;
-    return{x:cx+(Math.random()-0.5)*320,y:cy+(Math.random()-0.5)*180,vx:(Math.random()-0.5)*1.2,vy:-0.3-Math.random()*1.4,life:1,decay:0.008+Math.random()*0.012,size:1+Math.random()*2.5,hue:Math.random()<0.7?'232,25,125':'180,140,255'};
+    return{x:cx+(Math.random()-0.5)*420,y:cy+(Math.random()-0.5)*280,vx:(Math.random()-0.5)*0.9,vy:-0.2-Math.random()*1,life:1,decay:0.005+Math.random()*0.01,size:1.2+Math.random()*2.8,hue:Math.random()<0.75?'232,25,125':'180,140,255'};
   }
-  for(var i=0;i<60;i++)particles.push(spawnParticle());
+  for(var i=0;i<95;i++)particles.push(spawnParticle());
   function drawParticles(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     particles.forEach(function(p,i){
