@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
 :root{--bg:#111113;--sf:#1a1a1e;--bd:#2a2a32;--pk:#e8197d;--pd:rgba(232,25,125,.12);--pg:rgba(232,25,125,.3);--wh:#fff;--mt:#5c5c78;--dn:#ff3355;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
@@ -142,6 +142,51 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .st-tag.fail{background:rgba(255,51,85,.08);color:var(--dn);border:1px solid rgba(255,51,85,.2);}
 .st-pb{width:100%;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
 .st-pf{height:100%;width:0;background:linear-gradient(90deg,var(--pk),#ff79b0);border-radius:2px;transition:width 3s linear;}
+
+/* Teacher code screen — референс дизайн */
+#screen-teacher-code{align-items:center;justify-content:center;padding:40px 20px;min-height:100vh;position:relative;overflow:hidden;}
+#screen-teacher-code .tc-wrap{position:relative;width:100%;max-width:420px;}
+#screen-teacher-code .tc-grid-bg{position:absolute;inset:-100px;background-image:linear-gradient(rgba(232,25,125,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,25,125,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
+#screen-teacher-code .tc-vignette{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,transparent 30%,var(--bg) 85%);pointer-events:none;}
+#screen-teacher-code .tc-glow{position:absolute;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(232,25,125,.14) 0%,transparent 70%);top:-120px;right:-80px;pointer-events:none;}
+#screen-teacher-code .tc-glow2{position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(80,20,180,.12) 0%,transparent 70%);bottom:-60px;left:-60px;pointer-events:none;}
+#screen-teacher-code .tc-card{position:relative;z-index:2;display:flex;flex-direction:column;gap:0;}
+#screen-teacher-code .tc-eyebrow{display:flex;align-items:center;gap:10px;margin-bottom:32px;}
+#screen-teacher-code .tc-e-pip{width:8px;height:8px;border-radius:50%;background:var(--pk);box-shadow:0 0 10px var(--pk),0 0 20px var(--pd);flex-shrink:0;}
+#screen-teacher-code .tc-e-rule{flex:1;height:1px;background:linear-gradient(90deg,rgba(232,25,125,.4),transparent);}
+#screen-teacher-code .tc-e-label{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;color:var(--pk);letter-spacing:.2em;text-transform:uppercase;opacity:.8;}
+#screen-teacher-code .tc-heading{margin-bottom:36px;}
+#screen-teacher-code .tc-heading-accent{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(232,25,125,.6);margin-bottom:8px;}
+#screen-teacher-code .tc-heading-main{font-family:'Unbounded',sans-serif;font-size:clamp(28px,5vw,42px);font-weight:900;line-height:1.0;letter-spacing:-.03em;color:var(--wh);}
+#screen-teacher-code .tc-heading-main span{color:var(--pk);}
+#screen-teacher-code .tc-heading-sub{margin-top:10px;font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.35);line-height:1.6;}
+#screen-teacher-code .tc-field{margin-bottom:20px;}
+#screen-teacher-code .tc-field-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+#screen-teacher-code .tc-field-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);font-weight:500;}
+#screen-teacher-code .tc-field-hint{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:rgba(232,25,125,.4);}
+#screen-teacher-code .tc-input-wrap{position:relative;}
+#screen-teacher-code .tc-input-wrap input{width:100%;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:var(--wh);font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:400;letter-spacing:.12em;padding:14px 48px 14px 18px;border-radius:10px;outline:none;transition:border-color .2s,background .2s,box-shadow .2s;-webkit-text-security:disc;}
+#screen-teacher-code .tc-input-wrap input::placeholder{color:rgba(255,255,255,.15);font-size:12px;letter-spacing:.08em;-webkit-text-security:none;}
+#screen-teacher-code .tc-input-wrap input:focus{border-color:rgba(232,25,125,.5);background:rgba(232,25,125,.04);box-shadow:0 0 0 3px rgba(232,25,125,.08),inset 0 0 20px rgba(232,25,125,.03);}
+#screen-teacher-code .tc-toggle-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(255,255,255,.2);font-size:14px;padding:4px;line-height:1;transition:color .2s;}
+#screen-teacher-code .tc-toggle-btn:hover{color:rgba(232,25,125,.7);}
+#screen-teacher-code .tc-dots-row{display:flex;gap:5px;align-items:center;margin-top:10px;min-height:12px;}
+#screen-teacher-code .tc-dot{width:6px;height:6px;border-radius:50%;background:rgba(232,25,125,.25);transition:background .15s,transform .15s;}
+#screen-teacher-code .tc-dot.filled{background:var(--pk);box-shadow:0 0 6px rgba(232,25,125,.6);transform:scale(1.1);}
+#screen-teacher-code .tc-err-msg{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#ff4466;display:flex;align-items:center;gap:6px;margin-top:10px;opacity:0;transition:opacity .2s;}
+#screen-teacher-code .tc-err-msg.visible{opacity:1;}
+#screen-teacher-code .tc-err-pip{width:4px;height:4px;border-radius:50%;background:#ff4466;flex-shrink:0;}
+#screen-teacher-code .tc-btn-submit{width:100%;padding:16px 24px;background:var(--pk);border:none;border-radius:10px;color:var(--wh);font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;cursor:pointer;position:relative;overflow:hidden;transition:transform .15s,box-shadow .2s;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;}
+#screen-teacher-code .tc-btn-submit::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,transparent 50%);pointer-events:none;}
+#screen-teacher-code .tc-btn-submit:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(232,25,125,.4),0 4px 12px rgba(232,25,125,.2);}
+#screen-teacher-code .tc-btn-submit:active{transform:translateY(0);}
+#screen-teacher-code .tc-btn-arrow{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:10px;}
+#screen-teacher-code .tc-divider{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+#screen-teacher-code .tc-div-line{flex:1;height:1px;background:rgba(255,255,255,.06);}
+#screen-teacher-code .tc-div-txt{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.15);text-transform:uppercase;}
+#screen-teacher-code .tc-footer{display:flex;align-items:center;gap:8px;}
+#screen-teacher-code .tc-lock-icon{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+#screen-teacher-code .tc-footer-txt{font-family:'Inter',sans-serif;font-size:11px;color:rgba(255,255,255,.18);line-height:1.5;}
 </style>
 </head>
 <body>
@@ -151,23 +196,53 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- Код преподавателя (секрет только на сервере, во фронте не хранится) -->
 <div class="screen" id="screen-teacher-code">
-  <div class="setup-card">
-    <div class="s-brand">
-      <div class="s-brand-dot"></div>
-      <div class="s-brand-txt">STARTUP<br>STUDIO <em>NSU</em></div>
-    </div>
-    <div class="setup-h">
-      <div class="setup-title">Вход для<br>преподавателя</div>
-      <div class="setup-sub">Введите код доступа, чтобы создать сессию отметки.</div>
-    </div>
-    <div class="fields">
-      <div class="field">
-        <label>Код преподавателя</label>
-        <input type="password" id="inp-teacher-code" placeholder="Введите код" autocomplete="off" />
+  <div class="tc-wrap">
+    <div class="tc-grid-bg"></div>
+    <div class="tc-vignette"></div>
+    <div class="tc-glow"></div>
+    <div class="tc-glow2"></div>
+    <div class="tc-card">
+      <div class="tc-eyebrow">
+        <div class="tc-e-pip"></div>
+        <div class="tc-e-label">Startup Studio NSU</div>
+        <div class="tc-e-rule"></div>
       </div>
-      <div id="teacher-code-err" class="geo-status err" style="display:none;margin-top:8px;"></div>
+      <div class="tc-heading">
+        <div class="tc-heading-main">Вход для<br><span>препода</span></div>
+        <div class="tc-heading-sub">Введите код доступа, чтобы создать сессию отметки.</div>
+      </div>
+      <div class="tc-field">
+        <div class="tc-field-header">
+          <div class="tc-field-lbl">Код доступа</div>
+          <div class="tc-field-hint">● секретный</div>
+        </div>
+        <div class="tc-input-wrap">
+          <input type="password" id="inp-teacher-code" placeholder="••••••••" maxlength="32" autocomplete="off"
+            oninput="onTeacherCodeInput(this.value)" onkeydown="if(event.key==='Enter')submitTeacherCode()" />
+          <button type="button" class="tc-toggle-btn" id="teacher-code-toggle" onclick="toggleTeacherCodeVis()" title="Показать/скрыть">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="tc-dots-row" id="teacher-code-dots">
+          <div class="tc-dot" id="tcd0"></div><div class="tc-dot" id="tcd1"></div><div class="tc-dot" id="tcd2"></div><div class="tc-dot" id="tcd3"></div>
+          <div class="tc-dot" id="tcd4"></div><div class="tc-dot" id="tcd5"></div><div class="tc-dot" id="tcd6"></div><div class="tc-dot" id="tcd7"></div>
+        </div>
+        <div class="tc-err-msg" id="teacher-code-err">
+          <div class="tc-err-pip"></div>
+          <span id="teacher-code-err-txt"></span>
+        </div>
+      </div>
+      <button type="button" class="tc-btn-submit" onclick="submitTeacherCode()">ВОЙТИ<div class="tc-btn-arrow">→</div></button>
+      <div class="tc-divider">
+        <div class="tc-div-line"></div>
+        <div class="tc-div-txt">защищённое соединение</div>
+        <div class="tc-div-line"></div>
+      </div>
+      <div class="tc-footer">
+        <div class="tc-lock-icon">🔐</div>
+        <div class="tc-footer-txt">Код выдаётся администратором.<br>Не передавайте его третьим лицам.</div>
+      </div>
     </div>
-    <button class="btn-go" onclick="submitTeacherCode()">ВОЙТИ</button>
   </div>
 </div>
 
@@ -346,25 +421,51 @@ async function initTeacherEntry(){
   show('screen-teacher-code');
 }
 
+function onTeacherCodeInput(v){
+  for(let i=0;i<8;i++){
+    const d=document.getElementById('tcd'+i);
+    if(d)d.className='tc-dot'+(i<v.length?' filled':'');
+  }
+  const errWrap=document.getElementById('teacher-code-err');
+  if(errWrap)errWrap.classList.remove('visible');
+}
+
+function toggleTeacherCodeVis(){
+  const inp=document.getElementById('inp-teacher-code');
+  const btn=document.getElementById('teacher-code-toggle');
+  if(!inp||!btn)return;
+  const isText=inp.type==='text';
+  inp.type=isText?'password':'text';
+  btn.style.color=isText?'rgba(255,255,255,.2)':'rgba(232,25,125,.7)';
+}
+
 async function submitTeacherCode(){
   const inp=document.getElementById('inp-teacher-code');
-  const errEl=document.getElementById('teacher-code-err');
+  const errWrap=document.getElementById('teacher-code-err');
+  const errTxt=document.getElementById('teacher-code-err-txt');
   const code=(inp&&inp.value)?String(inp.value).trim():'';
-  if(!code){if(errEl){errEl.style.display='block';errEl.textContent='Введите код.';}return;}
-  if(errEl)errEl.style.display='none';
+  if(!code){
+    if(errTxt)errTxt.textContent='Введите код доступа.';
+    if(errWrap)errWrap.classList.add('visible');
+    return;
+  }
+  if(errWrap)errWrap.classList.remove('visible');
   try{
     const r=await fetch(`${API_BASE}/api/verify-teacher`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
     const data=await r.json();
     if(!r.ok){
-      if(errEl){errEl.style.display='block';errEl.textContent=(data.error==='invalid_code')?'Неверный код.':'Ошибка сервера.';}
+      if(errTxt)errTxt.textContent=(data.error==='invalid_code')?'Неверный код.':'Ошибка сервера.';
+      if(errWrap)errWrap.classList.add('visible');
       return;
     }
     if(data.token){sessionStorage.setItem('teacherToken',data.token);}
     inp.value='';
+    onTeacherCodeInput('');
     show('screen-setup');
     setTimeout(()=>{if(navigator.geolocation)captureGeo();},400);
   }catch(e){
-    if(errEl){errEl.style.display='block';errEl.textContent='Нет связи с сервером.';}
+    if(errTxt)errTxt.textContent='Нет связи с сервером.';
+    if(errWrap)errWrap.classList.add('visible');
   }
 }
 
@@ -447,7 +548,7 @@ async function startSession(){
   }
 
   const teacherToken=sessionStorage.getItem('teacherToken');
-  if(!teacherToken){show('screen-teacher-code');const errEl=document.getElementById('teacher-code-err');if(errEl){errEl.style.display='block';errEl.textContent='Сессия истекла. Введите код преподавателя снова.';}return;}
+  if(!teacherToken){show('screen-teacher-code');const e=document.getElementById('teacher-code-err-txt'),w=document.getElementById('teacher-code-err');if(e)e.textContent='Сессия истекла. Введите код преподавателя снова.';if(w)w.classList.add('visible');return;}
   try{
     const resp=await fetch(`${API_BASE}/api/sessions`,{
       method:'POST',
@@ -467,8 +568,9 @@ async function startSession(){
     if(resp.status===403&&(data.error==='teacher_required'||data.error==='invalid_or_expired')){
       sessionStorage.removeItem('teacherToken');
       show('screen-teacher-code');
-      const errEl=document.getElementById('teacher-code-err');
-      if(errEl){errEl.style.display='block';errEl.textContent='Сессия истекла. Введите код преподавателя снова.';}
+      const e=document.getElementById('teacher-code-err-txt'),w=document.getElementById('teacher-code-err');
+      if(e)e.textContent='Сессия истекла. Введите код преподавателя снова.';
+      if(w)w.classList.add('visible');
       return;
     }
     if(!resp.ok){throw new Error('create');}
