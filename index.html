@@ -19,8 +19,11 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 .n1{width:600px;height:600px;background:var(--pk);top:-200px;right:-150px;}
 .n2{width:400px;height:400px;background:#4400bb;bottom:-150px;left:-100px;animation-direction:reverse;animation-duration:18s;}
 @keyframes ndrift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,25px)}}
-.screen{display:none;position:relative;z-index:10;min-height:100vh;}
-.screen.active{display:flex;}
+/* Общий слой частиц — не сбрасывается при смене экрана */
+.app-particles-layer{position:fixed;inset:0;z-index:5;pointer-events:none;}
+/* Плавные переходы: меняется только контент, частицы общие */
+.screen{position:fixed;inset:0;display:flex;opacity:0;visibility:hidden;pointer-events:none;z-index:10;min-height:100vh;transition:opacity .4s ease;}
+.screen.active{opacity:1;visibility:visible;pointer-events:auto;}
 
 /* ===================== SPLASH ===================== */
 #screen-splash{
@@ -93,8 +96,7 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 @keyframes splashProgress{to{width:100%;}}
 
 /* SETUP */
-#screen-setup{align-items:center;justify-content:center;padding:40px 20px;position:relative;}
-.setup-particles{position:absolute;inset:0;z-index:0;pointer-events:none;}
+#screen-setup{align-items:center;justify-content:center;padding:40px 20px;}
 #screen-setup .setup-card{position:relative;z-index:1;}
 .setup-card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:24px;}
 .s-brand{display:flex;align-items:center;gap:12px;}
@@ -130,8 +132,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .radius-val{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;color:var(--pk);white-space:nowrap;min-width:44px;}
 
 /* TEACHER — 3-row grid */
-#screen-teacher{flex-direction:column;align-items:stretch;position:relative;}
-.teacher-particles{position:absolute;inset:0;z-index:0;pointer-events:none;}
+#screen-teacher{flex-direction:column;align-items:stretch;}
 #screen-teacher .tl{position:relative;z-index:1;}
 .tl{display:grid;grid-template-rows:64px 1fr 52px;height:100vh;max-width:1100px;width:100%;margin:0 auto;padding:0 48px;}
 
@@ -194,8 +195,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 }
 
 /* STUDENT */
-#screen-student{align-items:center;justify-content:center;padding:40px 20px;flex-direction:column;gap:0;position:relative;}
-.st-particles{position:absolute;inset:0;z-index:0;pointer-events:none;}
+#screen-student{align-items:center;justify-content:center;padding:40px 20px;flex-direction:column;gap:0;}
 #screen-student .st-brand,#screen-student .st-card{position:relative;z-index:1;}
 .st-brand{display:flex;align-items:center;gap:9px;margin-bottom:28px;}
 .st-bd{width:12px;height:12px;border-radius:50%;background:var(--pk);box-shadow:0 0 12px var(--pg);}
@@ -221,8 +221,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .st-pf{height:100%;width:0;background:linear-gradient(90deg,var(--pk),#ff79b0);border-radius:2px;transition:width 3s linear;}
 
 /* Teacher code screen — референс дизайн */
-#screen-teacher-code{align-items:center;justify-content:center;padding:40px 20px;min-height:100vh;position:relative;overflow:hidden;}
-#screen-teacher-code .tc-particles{position:absolute;inset:0;z-index:0;pointer-events:none;}
+#screen-teacher-code{align-items:center;justify-content:center;padding:40px 20px;min-height:100vh;overflow:hidden;}
 #screen-teacher-code .tc-wrap{position:relative;z-index:1;width:100%;max-width:420px;}
 #screen-teacher-code .tc-grid-bg{position:absolute;inset:-100px;background-image:linear-gradient(rgba(232,25,125,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,25,125,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
 #screen-teacher-code .tc-vignette{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,transparent 30%,var(--bg) 85%);pointer-events:none;}
@@ -271,6 +270,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div class="bg-stars" id="bg-stars"></div>
 <div class="neb n1"></div>
 <div class="neb n2"></div>
+<canvas id="app-particles-canvas" class="app-particles-layer" aria-hidden="true"></canvas>
 
 <!-- Splash: чистая подложка + по центру анимация с белыми частицами -->
 <div id="screen-splash">
@@ -285,7 +285,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- Код преподавателя (секрет только на сервере, во фронте не хранится) -->
 <div class="screen" id="screen-teacher-code">
-  <canvas class="tc-particles" id="teacher-code-particles"></canvas>
   <div class="tc-wrap">
     <div class="tc-grid-bg"></div>
     <div class="tc-vignette"></div>
@@ -338,7 +337,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- SETUP -->
 <div class="screen" id="screen-setup">
-  <canvas class="setup-particles" id="setup-particles"></canvas>
   <div class="setup-card">
     <div class="s-brand">
       <div class="s-brand-dot"></div>
@@ -383,7 +381,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- TEACHER -->
 <div class="screen" id="screen-teacher">
-  <canvas class="teacher-particles" id="teacher-particles"></canvas>
   <div class="tl">
     <div class="topbar">
       <div class="tb-brand">
@@ -458,7 +455,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- STUDENT -->
 <div class="screen" id="screen-student">
-  <canvas class="st-particles" id="student-particles"></canvas>
   <div class="st-brand"><div class="st-bd"></div><div class="st-bn">STARTUP STUDIO NSU</div></div>
   <div class="st-card" id="st-card">
     <div class="st-icon spin"><div class="spin-r"></div></div>
@@ -501,6 +497,10 @@ const uSession=P.get('sid');
 const uGeo=P.get('g'); // в QR добавляется только если в сессии включена геопроверка
 
 function afterSplash(){
+  if(!window._appParticlesStarted&&window.startParticles){
+    window._appParticlesStarted=true;
+    window.startParticles('app-particles-canvas','slowChaotic');
+  }
   if(uToken&&uSession){show('screen-student');runCheck();}
   else{initTeacherEntry();}
 }
@@ -525,16 +525,9 @@ function afterSplash(){
   video.addEventListener('error',function(){});
 })();
 
-var particlesController=null;
 function show(id){
-  if(particlesController&&particlesController.cancel){particlesController.cancel();particlesController=null;}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(window.startParticles){
-    if(id==='screen-setup')particlesController=startParticles('setup-particles','slowChaotic');
-    else if(id==='screen-teacher')particlesController=startParticles('teacher-particles','slowChaotic');
-    else if(id==='screen-teacher-code')particlesController=startParticles('teacher-code-particles','slowChaotic');
-  }
 }
 
 async function initTeacherEntry(){
@@ -811,9 +804,7 @@ function haversine(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-function startStudentParticles(){
-  if(window.startParticles)window.startParticles('student-particles','student');
-}
+function startStudentParticles(){}
 
 async function runCheck(){
   if(!uToken||!uSession)return showFail('✕','Неверная ссылка','Параметры повреждены. Отсканируйте QR заново.');
@@ -878,6 +869,7 @@ async function runCheck(){
       if(err==='out_of_radius')return showFail('📍','Вы не в аудитории','Система определила, что вы вне аудитории.');
       if(err==='geolocation required')return showFail('📍','Нужна геолокация','Разрешите доступ к геопозиции и попробуйте снова.');
       if(err==='qr_code_overused')return showFail('⏱','Код перегружен','Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.');
+      if(resp.status===429||data.error==='too_many_requests')return showFail('⏱','Слишком много запросов','Подождите минуту и отсканируйте QR снова.');
       return showFail('✕','Ошибка','Не удалось пройти проверку. Попробуйте ещё раз.');
     }
     showStudentForm(data.session,data.oneTimeToken,fp);
@@ -943,6 +935,7 @@ function showStudentForm(session, oneTimeToken, fingerprint){
         const err=data.error||'unknown';
         if(err==='already_marked')return showFail('⚠','Уже отмечен','Вы уже отметились на этом занятии.');
         if(err==='oneTimeToken expired')return showFail('⏱','Сессия истекла','Слишком долгое заполнение. Отсканируйте QR заново.');
+        if(resp.status===429||err==='too_many_requests')return showFail('⏱','Слишком много запросов','Подождите минуту и попробуйте снова.');
         return showFail('✕','Ошибка','Не удалось сохранить отметку. Попробуйте снова.');
       }
       const card=document.getElementById('st-card');
