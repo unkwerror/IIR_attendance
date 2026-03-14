@@ -15,16 +15,11 @@
 <div class="neb n2"></div>
 <canvas id="app-particles-canvas" class="app-particles-layer" aria-hidden="true"></canvas>
 
-<!-- Splash: видео из startup.mp4 + частицы (те же, что под сплэшем — не перезапускаются при переходе) -->
+<!-- Splash: тёмный фон, маленькое видео по центру, хаотичные частицы -->
 <div id="screen-splash">
-  <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
-  <div class="splash-fallback" id="splash-fallback">
-    <div class="splash-orb"></div>
-    <div class="splash-center-title" aria-hidden="true">
-      <span class="splash-word splash-w1">Startup</span>
-      <span class="splash-word splash-w2">Studio</span>
-      <em class="splash-word splash-w3">NSU</em>
-    </div>
+  <canvas id="splash-particles-canvas" class="splash-particles-layer" aria-hidden="true"></canvas>
+  <div class="splash-video-box">
+    <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
   </div>
   <div class="splash-progress"><div class="splash-progress-fill" id="splash-progress-fill"></div></div>
 </div>

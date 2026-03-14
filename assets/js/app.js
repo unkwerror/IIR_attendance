@@ -33,6 +33,7 @@ function afterSplash() {
 function initSplash() {
   const splash = document.getElementById('screen-splash');
   const video = document.getElementById('splash-video');
+  const videoBox = video && video.closest('.splash-video-box');
   const progressFill = document.getElementById('splash-progress-fill');
   if (!splash || !video) {
     afterSplash();
@@ -42,10 +43,13 @@ function initSplash() {
   const CROSSFADE_MS = 700;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
+  const splashParticles = window.startParticles && window.startParticles('splash-particles-canvas', 'slowChaotic');
+
   let splashDismissed = false;
   function dismissSplash() {
     if (splashDismissed) return;
     splashDismissed = true;
+    if (splashParticles && splashParticles.cancel) splashParticles.cancel();
 
     const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
     show(target);
@@ -63,7 +67,10 @@ function initSplash() {
 
   let videoEnded = false;
   const safetyTimer = setTimeout(() => { if (!videoEnded) dismissSplash(); }, SPLASH_MS);
-  video.addEventListener('canplay', () => { video.classList.add('ready'); video.play().catch(() => {}); });
+  video.addEventListener('canplay', () => {
+    if (videoBox) videoBox.classList.add('ready');
+    video.play().catch(() => {});
+  });
   video.addEventListener('ended', () => { videoEnded = true; clearTimeout(safetyTimer); dismissSplash(); });
   video.addEventListener('error', () => {});
 }
