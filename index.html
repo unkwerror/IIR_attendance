@@ -24,7 +24,7 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 /* ===================== SPLASH ===================== */
 #screen-splash{
   position:fixed;inset:0;z-index:999;
-  background:#0c0c0e;
+  background:var(--bg);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   transition:opacity .7s ease;
@@ -40,7 +40,7 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
   opacity:0;
   transition:opacity .5s ease;
 }
-.splash-video.ready{opacity:0.15;}
+.splash-video.ready{opacity:0;}
 .splash-fallback{
   position:relative;z-index:2;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -78,38 +78,6 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 }
 .splash-center-title em{color:var(--pk);font-style:normal;}
 .splash-particles{position:absolute;inset:0;z-index:1;pointer-events:none;}
-.splash-noise{
-  position:absolute;inset:0;z-index:3;
-  opacity:.03;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size:128px 128px;
-  pointer-events:none;
-}
-.splash-vignette{
-  position:absolute;inset:0;z-index:2;
-  background:radial-gradient(ellipse at center, transparent 35%, rgba(12,12,14,.85) 100%);
-  pointer-events:none;
-}
-.splash-corner{
-  position:absolute;z-index:4;
-  width:32px;height:32px;
-  border-color:rgba(232,25,125,.4);
-  border-style:solid;
-}
-.splash-corner.tl{top:24px;left:24px;border-width:1.5px 0 0 1.5px;}
-.splash-corner.tr{top:24px;right:24px;border-width:1.5px 1.5px 0 0;}
-.splash-corner.bl{bottom:24px;left:24px;border-width:0 0 1.5px 1.5px;}
-.splash-corner.br{bottom:24px;right:24px;border-width:0 1.5px 1.5px 0;}
-.splash-label{
-  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
-  z-index:5;
-  font-family:'Unbounded',sans-serif;
-  font-size:9px;font-weight:400;
-  letter-spacing:.28em;text-transform:uppercase;
-  color:rgba(255,255,255,.2);
-  white-space:nowrap;
-  animation:splashFadeIn .8s ease .8s both;
-}
 .splash-progress{
   position:absolute;bottom:0;left:0;right:0;
   height:2px;z-index:5;
@@ -296,21 +264,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div class="neb n1"></div>
 <div class="neb n2"></div>
 
-<!-- Splash: видео + fallback-анимация, затем переход в приложение -->
+<!-- Splash: чистая подложка + по центру анимация с белыми частицами -->
 <div id="screen-splash">
   <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
   <canvas class="splash-particles" id="splash-canvas"></canvas>
-  <div class="splash-vignette"></div>
-  <div class="splash-noise"></div>
   <div class="splash-fallback" id="splash-fallback">
     <div class="splash-orb"></div>
     <div class="splash-center-title">Startup Studio <em>NSU</em></div>
   </div>
-  <div class="splash-corner tl"></div>
-  <div class="splash-corner tr"></div>
-  <div class="splash-corner bl"></div>
-  <div class="splash-corner br"></div>
-  <div class="splash-label">Система учёта посещаемости</div>
   <div class="splash-progress"><div class="splash-progress-fill" id="splash-progress-fill"></div></div>
 </div>
 
