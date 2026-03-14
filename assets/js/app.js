@@ -44,15 +44,25 @@ function initSplash() {
 
   let lottieInstance = null;
   if (lottieEl && typeof lottie !== 'undefined') {
-    try {
-      lottieInstance = lottie.loadAnimation({
-        container: lottieEl,
-        renderer: 'svg',
-        loop: true,
-        autoplay: true,
-        path: 'assets/lottie/animation.json'
-      });
-    } catch (e) {}
+    const animPath = 'assets/Animation - 1773478714376/animations/375f772d-9ece-465a-b91e-626b31e508a3.json';
+    const assetsBase = 'assets/Animation - 1773478714376/images/';
+    fetch(animPath)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.assets && Array.isArray(data.assets)) {
+          data.assets.forEach((a) => {
+            if (a.u === '/images/') a.u = assetsBase;
+          });
+        }
+        lottieInstance = lottie.loadAnimation({
+          container: lottieEl,
+          renderer: 'svg',
+          loop: true,
+          autoplay: true,
+          animationData: data
+        });
+      })
+      .catch(() => {});
   }
 
   let splashDismissed = false;
