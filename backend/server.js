@@ -15,6 +15,36 @@ const TEACHER_SECRET = process.env.TEACHER_SECRET || '';
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 часа
 const teacherTokens = new Map(); // token -> { expires }
 
+// Ограничение попыток ввода кода преподавателя (защита от перебора)
+const VERIFY_RATE_WINDOW_MS = 15 * 60 * 1000; // 15 минут
+const VERIFY_MAX_ATTEMPTS = 5;
+const verifyAttempts = new Map(); // ip -> { count, resetAt }
+
+function isVerifyRateLimited(ip) {
+  const now = Date.now();
+  let rec = verifyAttempts.get(ip);
+  if (!rec) return false;
+  if (now >= rec.resetAt) {
+    verifyAttempts.delete(ip);
+    return false;
+  }
+  return rec.count >= VERIFY_MAX_ATTEMPTS;
+}
+
+function recordVerifyAttempt(ip, success) {
+  if (success) {
+    verifyAttempts.delete(ip);
+    return;
+  }
+  const now = Date.now();
+  let rec = verifyAttempts.get(ip);
+  if (!rec) {
+    rec = { count: 0, resetAt: now + VERIFY_RATE_WINDOW_MS };
+    verifyAttempts.set(ip, rec);
+  }
+  rec.count += 1;
+}
+
 function cleanupExpiredTokens() {
   const now = Date.now();
   for (const [token, data] of teacherTokens.entries()) {
@@ -127,15 +157,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Проверка кода преподавателя — код только на сервере, constant-time сравнение
+// Проверка кода преподавателя — код только на сервере, constant-time сравнение + rate limit
 app.post('/api/verify-teacher', (req, res) => {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  if (isVerifyRateLimited(ip)) {
+    return res.status(429).json({ error: 'too_many_attempts' });
+  }
   const code = (req.body && req.body.code) ? String(req.body.code).trim() : '';
   if (!TEACHER_SECRET) {
     return res.status(503).json({ error: 'teacher_auth_not_configured' });
   }
   if (!constantTimeCompare(code, TEACHER_SECRET)) {
+    recordVerifyAttempt(ip, false);
     return res.status(401).json({ error: 'invalid_code' });
   }
+  recordVerifyAttempt(ip, true);
   const token = crypto.randomBytes(32).toString('hex');
   teacherTokens.set(token, { expires: Date.now() + TOKEN_TTL_MS });
   res.json({ ok: true, token });
@@ -150,11 +186,13 @@ app.post('/api/check-teacher-token', (req, res) => {
   res.json({ ok: true });
 });
 
+// Криптостойкие идентификаторы и токены (не Math.random)
 function genId(len = 24) {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(len);
   let out = '';
   for (let i = 0; i < len; i++) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    out += alphabet[bytes[i] % alphabet.length];
   }
   return out;
 }
@@ -182,12 +220,17 @@ app.post('/api/sessions', async (req, res) => {
   if (!subject || !qrInterval) {
     return res.status(400).json({ error: 'subject и qrInterval обязательны' });
   }
+  const subjectStr = String(subject).trim();
+  if (subjectStr.length > 300) {
+    return res.status(400).json({ error: 'subject слишком длинное' });
+  }
 
   const sessionId = genId(16);
+  const qrIntervalCap = Math.min(30, Math.max(5, Number(qrInterval) || 15));
   const values = [
     sessionId,
-    subject,
-    Number(qrInterval) || 15,
+    subjectStr,
+    qrIntervalCap,
     geoLat ?? null,
     geoLng ?? null,
     geoRadius != null ? Number(geoRadius) : null,
@@ -227,9 +270,16 @@ app.post('/api/sessions', async (req, res) => {
   }
 });
 
+function isValidId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9]{8,64}$/.test(id);
+}
+
 // Генерация нового QR‑токена для сессии
 app.post('/api/sessions/:id/qr-token', async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'invalid session id' });
+  }
   try {
     const { rows } = await pool.query(
       'select id, qr_interval, ended_at from sessions where id = $1',
@@ -244,7 +294,9 @@ app.post('/api/sessions/:id/qr-token', async (req, res) => {
     }
 
     const token = genId(14);
-    const lifetimeSec = Number(req.body?.lifetimeSec) || session.qr_interval || 15;
+    // Ограничение времени жизни QR: макс 30 сек — меньше окно для пересылки ссылки
+    const requestedSec = Number(req.body?.lifetimeSec) || session.qr_interval || 15;
+    const lifetimeSec = Math.min(30, Math.max(5, requestedSec));
     const expiresAt = new Date(Date.now() + lifetimeSec * 1000);
 
     await pool.query(
@@ -270,6 +322,9 @@ app.post('/api/check', async (req, res) => {
 
   if (!sessionId || !token || !fingerprint) {
     return res.status(400).json({ error: 'sessionId, token и fingerprint обязательны' });
+  }
+  if (!isValidId(sessionId) || !isValidId(token) || String(fingerprint).length > 500) {
+    return res.status(400).json({ error: 'invalid parameters' });
   }
 
   try {
@@ -327,13 +382,33 @@ app.post('/api/check', async (req, res) => {
       }
     }
 
+    // Лимит устройств на один QR-код: защита от массовой пересылки ссылки
+    const MAX_DEVICES_PER_QR = 45;
+    try {
+      const { rows: countRows } = await pool.query(
+        `select count(*) as c from qr_tokens
+         where parent_qr_token = $1 and is_one_time = true`,
+        [token]
+      );
+      const count = parseInt(countRows[0]?.c || 0, 10);
+      if (count >= MAX_DEVICES_PER_QR) {
+        return res.status(403).json({
+          error: 'qr_code_overused',
+          message: 'Этим кодом уже отметилось слишком много устройств. Отсканируйте свежий QR с экрана.'
+        });
+      }
+    } catch (e) {
+      // Если колонка parent_qr_token ещё не добавлена (старая БД), лимит не применяем
+      if (e.code !== '42703') throw e;
+    }
+
     // Раздаём одноразовый токен для формы
     const oneTimeToken = genId(20);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await pool.query(
-      `insert into qr_tokens (token, session_id, expires_at, fingerprint, is_one_time)
-       values ($1,$2,$3,$4,true)`,
-      [oneTimeToken, sessionId, expiresAt, fingerprint]
+      `insert into qr_tokens (token, session_id, expires_at, fingerprint, is_one_time, parent_qr_token)
+       values ($1,$2,$3,$4,true,$5)`,
+      [oneTimeToken, sessionId, expiresAt, fingerprint, token]
     );
 
     res.json({
@@ -357,6 +432,17 @@ app.post('/api/attendances', async (req, res) => {
 
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
     return res.status(400).json({ error: 'required fields missing' });
+  }
+  const name = String(studentName).trim();
+  const group = String(studentGroup).trim();
+  if (name.length > 200 || name.length < 1) {
+    return res.status(400).json({ error: 'studentName: длина 1–200 символов' });
+  }
+  if (group.length > 80 || group.length < 1) {
+    return res.status(400).json({ error: 'studentGroup: длина 1–80 символов' });
+  }
+  if (!isValidId(sessionId) || !isValidId(oneTimeToken) || String(fingerprint).length > 500) {
+    return res.status(400).json({ error: 'invalid parameters' });
   }
 
   try {
@@ -387,8 +473,6 @@ app.post('/api/attendances', async (req, res) => {
     }
 
     const id = genId(18);
-    const name = String(studentName).trim();
-    const group = String(studentGroup).trim();
 
     const client = await pool.connect();
     try {
@@ -464,6 +548,9 @@ app.post('/api/attendances', async (req, res) => {
 // Список отмеченных студентов для сессии
 app.get('/api/sessions/:id/attendances', async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'invalid session id' });
+  }
   try {
     const { rows: sessRows } = await pool.query(
       'select id from sessions where id = $1',
@@ -498,6 +585,9 @@ app.get('/api/sessions/:id/attendances', async (req, res) => {
 // Завершение сессии
 app.post('/api/sessions/:id/end', async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'invalid session id' });
+  }
   try {
     const { rows } = await pool.query(
       `update sessions

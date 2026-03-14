@@ -18,7 +18,8 @@ create table if not exists qr_tokens (
   session_id text not null references sessions(id) on delete cascade,
   expires_at timestamptz not null,
   fingerprint text, -- заполняется только для одноразового токена формы
-  is_one_time boolean not null default false
+  is_one_time boolean not null default false,
+  parent_qr_token text -- для одноразовых: какой QR-токен использовался при проверке (лимит устройств на один код)
 );
 
 create table if not exists attendances (
@@ -32,4 +33,7 @@ create table if not exists attendances (
 
 create index if not exists idx_attendances_session_id on attendances(session_id);
 create index if not exists idx_attendances_session_fp on attendances(session_id, fingerprint);
+
+-- Миграция: лимит устройств на один QR-код (защита от пересылки ссылки)
+alter table qr_tokens add column if not exists parent_qr_token text;
 

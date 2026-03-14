@@ -21,6 +21,124 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 .screen{display:none;position:relative;z-index:10;min-height:100vh;}
 .screen.active{display:flex;}
 
+/* ===================== SPLASH ===================== */
+#screen-splash{
+  position:fixed;inset:0;z-index:999;
+  background:#0c0c0e;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  transition:opacity .7s ease;
+}
+#screen-splash.hide{
+  opacity:0;
+  pointer-events:none;
+}
+.splash-video{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  opacity:0;
+  transition:opacity .5s ease;
+}
+.splash-video.ready{opacity:1;}
+.splash-fallback{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;align-items:flex-start;
+  gap:0;
+  opacity:0;
+  animation:splashFadeIn .6s ease .2s forwards;
+  pointer-events:none;
+}
+@keyframes splashFadeIn{to{opacity:1;}}
+.splash-orb{
+  width:56px;height:56px;border-radius:50%;
+  background:var(--pk);
+  box-shadow:0 0 60px rgba(232,25,125,.8),0 0 120px rgba(232,25,125,.4);
+  margin-bottom:28px;
+  animation:splashOrb 1.4s cubic-bezier(.215,.61,.355,1) forwards;
+  transform:scale(0);
+}
+@keyframes splashOrb{
+  0%{transform:scale(0);opacity:0;}
+  60%{transform:scale(1.12);}
+  100%{transform:scale(1);opacity:1;}
+}
+.splash-word{
+  font-family:'Unbounded',sans-serif;
+  font-size:clamp(52px,11vw,110px);
+  font-weight:900;
+  line-height:.92;
+  letter-spacing:-.04em;
+  color:transparent;
+  -webkit-text-stroke:1.5px rgba(255,255,255,.9);
+  position:relative;
+  overflow:hidden;
+  clip-path:inset(0 100% 0 0);
+  animation:splashReveal .7s cubic-bezier(.77,0,.18,1) forwards;
+}
+.splash-word:nth-child(2){animation-delay:.12s;}
+.splash-word:nth-child(3){animation-delay:.22s;}
+.splash-word span{
+  position:absolute;inset:0;
+  color:#fff;
+  -webkit-text-stroke:0;
+  clip-path:inset(0 100% 0 0);
+  animation:splashFill .9s cubic-bezier(.77,0,.18,1) .6s forwards;
+}
+@keyframes splashReveal{
+  0%{clip-path:inset(0 100% 0 0);}
+  100%{clip-path:inset(0 0% 0 0);}
+}
+@keyframes splashFill{
+  0%{clip-path:inset(0 100% 0 0);}
+  100%{clip-path:inset(0 0% 0 0);}
+}
+.splash-particles{position:absolute;inset:0;z-index:1;pointer-events:none;}
+.splash-noise{
+  position:absolute;inset:0;z-index:3;
+  opacity:.03;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:128px 128px;
+  pointer-events:none;
+}
+.splash-vignette{
+  position:absolute;inset:0;z-index:2;
+  background:radial-gradient(ellipse at center, transparent 35%, rgba(12,12,14,.85) 100%);
+  pointer-events:none;
+}
+.splash-corner{
+  position:absolute;z-index:4;
+  width:32px;height:32px;
+  border-color:rgba(232,25,125,.4);
+  border-style:solid;
+}
+.splash-corner.tl{top:24px;left:24px;border-width:1.5px 0 0 1.5px;}
+.splash-corner.tr{top:24px;right:24px;border-width:1.5px 1.5px 0 0;}
+.splash-corner.bl{bottom:24px;left:24px;border-width:0 0 1.5px 1.5px;}
+.splash-corner.br{bottom:24px;right:24px;border-width:0 1.5px 1.5px 0;}
+.splash-label{
+  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
+  z-index:5;
+  font-family:'Unbounded',sans-serif;
+  font-size:9px;font-weight:400;
+  letter-spacing:.28em;text-transform:uppercase;
+  color:rgba(255,255,255,.2);
+  white-space:nowrap;
+  animation:splashFadeIn .8s ease .8s both;
+}
+.splash-progress{
+  position:absolute;bottom:0;left:0;right:0;
+  height:2px;z-index:5;
+  background:rgba(255,255,255,.05);
+  overflow:hidden;
+}
+.splash-progress-fill{
+  height:100%;width:0;
+  background:linear-gradient(90deg,transparent,var(--pk),transparent);
+  animation:splashProgress var(--splash-duration,3.2s) linear forwards;
+}
+@keyframes splashProgress{to{width:100%;}}
+
 /* SETUP */
 #screen-setup{align-items:center;justify-content:center;padding:40px 20px;}
 .setup-card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:24px;}
@@ -194,6 +312,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div class="neb n1"></div>
 <div class="neb n2"></div>
 
+<!-- Splash: видео + fallback-анимация, затем переход в приложение -->
+<div id="screen-splash">
+  <video class="splash-video" id="splash-video" src="assets/startup.mp4" muted playsinline preload="auto"></video>
+  <canvas class="splash-particles" id="splash-canvas"></canvas>
+  <div class="splash-vignette"></div>
+  <div class="splash-noise"></div>
+  <div class="splash-fallback" id="splash-fallback">
+    <div class="splash-orb"></div>
+    <div class="splash-word">STARTUP<span>STARTUP</span></div>
+    <div class="splash-word">STUDIO<span>STUDIO</span></div>
+    <div class="splash-word">NSU<span>NSU</span></div>
+  </div>
+  <div class="splash-corner tl"></div>
+  <div class="splash-corner tr"></div>
+  <div class="splash-corner bl"></div>
+  <div class="splash-corner br"></div>
+  <div class="splash-label">Система учёта посещаемости</div>
+  <div class="splash-progress"><div class="splash-progress-fill" id="splash-progress-fill"></div></div>
+</div>
+
 <!-- Код преподавателя (секрет только на сервере, во фронте не хранится) -->
 <div class="screen" id="screen-teacher-code">
   <div class="tc-wrap">
@@ -265,11 +403,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <!-- Раньше здесь была ссылка на Google Forms — теперь не нужна -->
       <div class="field">
         <label>Обновлять QR каждые (сек)</label>
-        <input type="number" id="inp-interval" value="15" min="5" max="120" />
+        <input type="number" id="inp-interval" value="15" min="5" max="30" title="До 30 сек — меньше шансов переслать ссылку" />
+        <div style="font-size:11px;color:var(--mt);margin-top:4px;">5–30 сек. Короткий интервал мешает пересылать код отсутствующим.</div>
       </div>
 
       <div class="geo-section">
-        <div class="geo-section-lbl">📍 Геолокация аудитории</div>
+        <div class="geo-section-lbl">📍 Геолокация аудитории (рекомендуется: только в аудитории смогут отметиться)</div>
         <div class="geo-row">
           <div class="field">
             <label>Координаты аудитории</label>
@@ -404,9 +543,55 @@ function getParams(){
 const P=getParams();
 const uToken=P.get('t');
 const uSession=P.get('sid');
+const uGeo=P.get('g'); // в QR добавляется только если в сессии включена геопроверка
 
-if(uToken&&uSession){show('screen-student');runCheck();}
-else{initTeacherEntry();}
+function afterSplash(){
+  if(uToken&&uSession){show('screen-student');runCheck();}
+  else{initTeacherEntry();}
+}
+
+(function(){
+  var splash=document.getElementById('screen-splash');
+  var video=document.getElementById('splash-video');
+  var fallback=document.getElementById('splash-fallback');
+  var canvas=document.getElementById('splash-canvas');
+  var progressFill=document.getElementById('splash-progress-fill');
+  if(!splash||!video){afterSplash();return;}
+  var ctx=canvas.getContext('2d');
+  var particles=[];
+  var animId;
+  function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  resizeCanvas();
+  window.addEventListener('resize',resizeCanvas);
+  function spawnParticle(){
+    var cx=window.innerWidth*0.5,cy=window.innerHeight*0.5;
+    return{x:cx+(Math.random()-0.5)*320,y:cy+(Math.random()-0.5)*180,vx:(Math.random()-0.5)*1.2,vy:-0.3-Math.random()*1.4,life:1,decay:0.008+Math.random()*0.012,size:1+Math.random()*2.5,hue:Math.random()<0.7?'232,25,125':'180,140,255'};
+  }
+  for(var i=0;i<60;i++)particles.push(spawnParticle());
+  function drawParticles(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(function(p,i){
+      p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;
+      if(p.life<=0)particles[i]=spawnParticle();
+      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fillStyle='rgba('+p.hue+','+p.life.toFixed(2)+')';ctx.fill();
+    });
+    animId=requestAnimationFrame(drawParticles);
+  }
+  drawParticles();
+  var SPLASH_MS=3400;
+  if(progressFill)progressFill.style.setProperty('--splash-duration',(SPLASH_MS/1000)+'s');
+  function dismissSplash(){
+    cancelAnimationFrame(animId);
+    splash.classList.add('hide');
+    setTimeout(function(){splash.style.display='none';afterSplash();},720);
+  }
+  var videoEnded=false;
+  var safetyTimer=setTimeout(function(){if(!videoEnded)dismissSplash();},SPLASH_MS);
+  video.addEventListener('canplay',function(){video.classList.add('ready');if(fallback)fallback.style.opacity='0';video.play().catch(function(){});});
+  video.addEventListener('ended',function(){videoEnded=true;clearTimeout(safetyTimer);dismissSplash();});
+  video.addEventListener('error',function(){});
+})();
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 
@@ -415,7 +600,7 @@ async function initTeacherEntry(){
   if(!token){show('screen-teacher-code');return;}
   try{
     const r=await fetch(`${API_BASE}/api/check-teacher-token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
-    if(r.ok){show('screen-setup');setTimeout(()=>{if(navigator.geolocation)captureGeo();},400);return;}
+    if(r.ok){show('screen-setup');return;}
   }catch(e){}
   sessionStorage.removeItem('teacherToken');
   show('screen-teacher-code');
@@ -454,7 +639,13 @@ async function submitTeacherCode(){
     const r=await fetch(`${API_BASE}/api/verify-teacher`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
     const data=await r.json();
     if(!r.ok){
-      if(errTxt)errTxt.textContent=(data.error==='invalid_code')?'Неверный код.':'Ошибка сервера.';
+      if(r.status===429||data.error==='too_many_attempts'){
+        if(errTxt)errTxt.textContent='Слишком много попыток. Подождите 15 минут.';
+      }else if(data.error==='invalid_code'){
+        if(errTxt)errTxt.textContent='Неверный код.';
+      }else{
+        if(errTxt)errTxt.textContent='Ошибка сервера.';
+      }
       if(errWrap)errWrap.classList.add('visible');
       return;
     }
@@ -462,7 +653,6 @@ async function submitTeacherCode(){
     inp.value='';
     onTeacherCodeInput('');
     show('screen-setup');
-    setTimeout(()=>{if(navigator.geolocation)captureGeo();},400);
   }catch(e){
     if(errTxt)errTxt.textContent='Нет связи с сервером.';
     if(errWrap)errWrap.classList.add('visible');
@@ -577,6 +767,7 @@ async function startSession(){
     const s=data.session;
     cfg.sessionId=data.sessionId;
     cfg.interval=s.qrInterval||interval;
+    cfg.geoRequired=!!s.geoRequired;
     document.getElementById('lbl-subject').textContent=s.subject;
     document.getElementById('info-ivl').textContent=`${cfg.interval} сек`;
     const geoChip=document.getElementById('info-geo');
@@ -605,7 +796,8 @@ async function genQR(){
     const tok=document.getElementById('info-tok');
     if(tok)tok.textContent=token.slice(0,8)+'…';
     const base=location.origin+location.pathname;
-    const url=`${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
+    let url=`${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
+    if(cfg.geoRequired)url+='&g=1';
     renderQR(url);
   }catch(e){
     alert('Не удалось получить QR‑токен с сервера.');
@@ -696,7 +888,11 @@ async function runCheck(){
   }catch(e){}
 
   let lat=null,lng=null;
-  if(navigator.geolocation){
+  if(uGeo&&navigator.geolocation){
+    st.innerHTML=`
+      <div class="st-icon spin"><div class="spin-r"></div></div>
+      <div class="st-title spin">Проверяем геолокацию…</div>
+      <div class="st-desc">Разрешите доступ к местоположению</div>`;
     try{
       const pos=await new Promise((res,rej)=>
         navigator.geolocation.getCurrentPosition(res,rej,{timeout:10000,maximumAge:0,enableHighAccuracy:true})
@@ -704,8 +900,14 @@ async function runCheck(){
       lat=pos.coords.latitude;
       lng=pos.coords.longitude;
     }catch(e){
-      // ignore, server will decide if geo is required
+      if(e.code===1)return showFail('📍','Нужна геолокация','Разрешите доступ к геопозиции в настройках браузера и попробуйте снова.');
+      if(e.code===3)return showFail('📍','Геолокация недоступна','Не удалось определить местоположение. Попробуйте у окна или на улице.');
+      return showFail('📍','Нужна геолокация','Разрешите доступ к геопозиции и попробуйте снова.');
     }
+    st.innerHTML=`
+      <div class="st-icon spin"><div class="spin-r"></div></div>
+      <div class="st-title spin">Проверяем устройство…</div>
+      <div class="st-desc">Секунду — идёт проверка</div>`;
   }
 
   try{
@@ -728,6 +930,7 @@ async function runCheck(){
       if(err==='already_marked')return showFail('⚠','Уже отмечен','Вы уже отметились на этом занятии.');
       if(err==='out_of_radius')return showFail('📍','Вы не в аудитории','Система определила, что вы вне аудитории.');
       if(err==='geolocation required')return showFail('📍','Нужна геолокация','Разрешите доступ к геопозиции и попробуйте снова.');
+      if(err==='qr_code_overused')return showFail('⏱','Код перегружен','Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.');
       return showFail('✕','Ошибка','Не удалось пройти проверку. Попробуйте ещё раз.');
     }
     showStudentForm(data.session,data.oneTimeToken,fp);
@@ -826,13 +1029,14 @@ function startAttendancePolling(){
         listEl.innerHTML='<div style="font-size:12px;color:var(--mt);opacity:.8;">Пока никто не отметился.</div>';
         return;
       }
+      function esc(s){ if(s==null||s===undefined)return''; var d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
       listEl.innerHTML=items.map((it,idx)=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:11px;opacity:.6;">${idx+1}.</span>
-            <span>${it.name}</span>
+            <span>${esc(it.name)}</span>
           </div>
-          <span style="font-size:11px;color:var(--mt);">${it.group}</span>
+          <span style="font-size:11px;color:var(--mt);">${esc(it.group)}</span>
         </div>`).join('');
     }catch(e){
       // ignore polling errors
