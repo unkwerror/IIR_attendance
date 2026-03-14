@@ -109,9 +109,11 @@ function onTeacherCodeInput(v) {
 function toggleTeacherCodeVis() {
   const inp = document.getElementById('inp-teacher-code');
   const btn = document.getElementById('teacher-code-toggle');
+  const wrap = inp && inp.closest('.tc-input-wrap');
   if (!inp || !btn) return;
   const isText = inp.type === 'text';
   inp.type = isText ? 'password' : 'text';
+  if (wrap) wrap.classList.toggle('show-password', !isText);
   btn.style.color = isText ? 'rgba(255,255,255,.2)' : 'rgba(232,25,125,.7)';
 }
 
@@ -350,6 +352,52 @@ function esc(s) {
   return d.innerHTML;
 }
 
+const CYRILLIC_NAME_REG = /^[а-яА-ЯёЁ\s]*$/;
+const GROUP_REG = /^[а-яА-ЯёЁ0-9\-]*$/;
+const MAX_NAME_LEN = 80;
+const MAX_GROUP_LEN = 20;
+
+function filterCyrillicName(el) {
+  if (!el) return;
+  el.addEventListener('input', () => {
+    const v = el.value.replace(/[^а-яА-ЯёЁ\s]/g, '');
+    if (v.length > MAX_NAME_LEN) el.value = v.slice(0, MAX_NAME_LEN);
+    else if (v !== el.value) el.value = v;
+  });
+}
+
+function filterGroup(el) {
+  if (!el) return;
+  el.addEventListener('input', () => {
+    const v = el.value.replace(/[^а-яА-ЯёЁ0-9\-]/g, '');
+    if (v.length > MAX_GROUP_LEN) el.value = v.slice(0, MAX_GROUP_LEN);
+    else if (v !== el.value) el.value = v;
+  });
+}
+
+function validateCyrillicName(name) {
+  if (!name || !name.trim()) return 'Введите фамилию и имя.';
+  if (!CYRILLIC_NAME_REG.test(name)) return 'Только кириллица и пробелы. Без цифр и латиницы.';
+  if (name.length > MAX_NAME_LEN) return `Не более ${MAX_NAME_LEN} символов.`;
+  return null;
+}
+
+function validateGroup(group) {
+  if (!group || !group.trim()) return 'Введите группу.';
+  if (!GROUP_REG.test(group)) return 'Только кириллица, цифры и дефис.';
+  if (group.length > MAX_GROUP_LEN) return `Не более ${MAX_GROUP_LEN} символов.`;
+  return null;
+}
+
+function showStudentFieldError(inputEl, message) {
+  const errEl = document.getElementById('att-form-err');
+  if (errEl) {
+    errEl.textContent = message;
+    errEl.style.display = 'block';
+  }
+  if (inputEl) inputEl.focus();
+}
+
 function showFail(icon, title, desc) {
   const card = document.getElementById('st-card');
   if (!card) return;
@@ -438,25 +486,43 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
       <div class="st-desc">Введите свои данные, чтобы подтвердить присутствие.</div>
       <div class="st-sep"></div>
       <form id="att-form" style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:6px;">
-        <input type="text" id="st-name" placeholder="Фамилия Имя" required
+        <input type="text" id="st-name" placeholder="Фамилия Имя" required maxlength="80" autocomplete="off"
           style="width:100%;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;border-radius:10px;outline:none;">
-        <input type="text" id="st-group" placeholder="Группа (например, ИТ‑21)" required
+        <input type="text" id="st-group" placeholder="Группа" required maxlength="20" autocomplete="off"
           style="width:100%;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;border-radius:10px;outline:none;">
         <button type="submit"
           style="margin-top:4px;width:100%;padding:11px 14px;background:var(--pk);border:none;border-radius:10px;color:#fff;font-family:'Unbounded',sans-serif;font-size:12px;font-weight:800;letter-spacing:.08em;cursor:pointer;">
           ОТПРАВИТЬ
         </button>
+        <div id="att-form-err" role="alert" style="display:none;color:var(--dn);font-size:12px;margin-top:4px;"></div>
       </form>
       <div class="st-tag ok" style="margin-top:8px;">Сессия: ${session.subject || 'Занятие'}</div>
     </div>`;
 
   const form = document.getElementById('att-form');
   if (!form) return;
+  const nameInput = document.getElementById('st-name');
+  const groupInput = document.getElementById('st-group');
+  filterCyrillicName(nameInput);
+  filterGroup(groupInput);
+  const errEl = document.getElementById('att-form-err');
+  if (nameInput) nameInput.addEventListener('input', () => { if (errEl) errEl.style.display = 'none'; });
+  if (groupInput) groupInput.addEventListener('input', () => { if (errEl) errEl.style.display = 'none'; });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = document.getElementById('st-name').value.trim();
-    const group = document.getElementById('st-group').value.trim();
-    if (!name || !group) return;
+    const name = (nameInput && nameInput.value.trim()) || '';
+    const group = (groupInput && groupInput.value.trim()) || '';
+    const nameErr = validateCyrillicName(name);
+    if (nameErr) {
+      showStudentFieldError(nameInput, nameErr);
+      return;
+    }
+    const groupErr = validateGroup(group);
+    if (groupErr) {
+      showStudentFieldError(groupInput, groupErr);
+      return;
+    }
+    if (errEl) errEl.style.display = 'none';
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
     btn.textContent = 'Отправка...';
@@ -515,6 +581,7 @@ function startAttendancePolling() {
           </div>
           <span style="font-size:11px;color:var(--mt);">${esc(it.group)}</span>
         </div>`).join('');
+      listEl.scrollTop = listEl.scrollHeight;
     } catch (e) {}
   };
   load();
