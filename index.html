@@ -6,6 +6,7 @@
 <title>Startup Studio NSU — Посещаемость</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.min.js"></script>
+<script src="assets/particles.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
 :root{--bg:#111113;--sf:#1a1a1e;--bd:#2a2a32;--pk:#e8197d;--pd:rgba(232,25,125,.12);--pg:rgba(232,25,125,.3);--wh:#fff;--mt:#5c5c78;--dn:#ff3355;}
@@ -221,7 +222,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 /* Teacher code screen — референс дизайн */
 #screen-teacher-code{align-items:center;justify-content:center;padding:40px 20px;min-height:100vh;position:relative;overflow:hidden;}
-#screen-teacher-code .tc-wrap{position:relative;width:100%;max-width:420px;}
+#screen-teacher-code .tc-particles{position:absolute;inset:0;z-index:0;pointer-events:none;}
+#screen-teacher-code .tc-wrap{position:relative;z-index:1;width:100%;max-width:420px;}
 #screen-teacher-code .tc-grid-bg{position:absolute;inset:-100px;background-image:linear-gradient(rgba(232,25,125,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,25,125,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
 #screen-teacher-code .tc-vignette{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,transparent 30%,var(--bg) 85%);pointer-events:none;}
 #screen-teacher-code .tc-glow{position:absolute;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(232,25,125,.14) 0%,transparent 70%);top:-120px;right:-80px;pointer-events:none;}
@@ -283,6 +285,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- Код преподавателя (секрет только на сервере, во фронте не хранится) -->
 <div class="screen" id="screen-teacher-code">
+  <canvas class="tc-particles" id="teacher-code-particles"></canvas>
   <div class="tc-wrap">
     <div class="tc-grid-bg"></div>
     <div class="tc-vignette"></div>
@@ -505,50 +508,13 @@ function afterSplash(){
 (function(){
   var splash=document.getElementById('screen-splash');
   var video=document.getElementById('splash-video');
-  var fallback=document.getElementById('splash-fallback');
-  var canvas=document.getElementById('splash-canvas');
   var progressFill=document.getElementById('splash-progress-fill');
   if(!splash||!video){afterSplash();return;}
-  var ctx=canvas.getContext('2d');
-  var particles=[];
-  var animId;
-  function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  resizeCanvas();
-  window.addEventListener('resize',resizeCanvas);
-  function spawnParticle(fromCenter){
-    var W=canvas.width,H=canvas.height,cx=W*0.5,cy=H*0.5;
-    var x,y,vx,vy;
-    if(fromCenter){
-      x=cx+(Math.random()-0.5)*40;
-      y=cy+(Math.random()-0.5)*40;
-      var a=Math.random()*Math.PI*2;
-      var s=0.4+Math.random()*1.4;
-      vx=Math.cos(a)*s;
-      vy=Math.sin(a)*s;
-    }else{
-      x=Math.random()*W;
-      y=Math.random()*H;
-      vx=(Math.random()-0.5)*0.6;
-      vy=-0.1-Math.random()*0.5;
-    }
-    return{x:x,y:y,vx:vx,vy:vy,life:1,decay:0.003+Math.random()*0.008,size:1+Math.random()*2.2,hue:'255,255,255'};
-  }
-  for(var i=0;i<120;i++)particles.push(spawnParticle(true));
-  function drawParticles(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    particles.forEach(function(p,i){
-      p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;
-      if(p.life<=0)particles[i]=spawnParticle(false);
-      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-      ctx.fillStyle='rgba('+p.hue+','+(p.life*0.85).toFixed(2)+')';ctx.fill();
-    });
-    animId=requestAnimationFrame(drawParticles);
-  }
-  drawParticles();
+  var splashParticlesController=window.startParticles&&window.startParticles('splash-canvas','splash');
   var SPLASH_MS=3400;
   if(progressFill)progressFill.style.setProperty('--splash-duration',(SPLASH_MS/1000)+'s');
   function dismissSplash(){
-    cancelAnimationFrame(animId);
+    if(splashParticlesController&&splashParticlesController.cancel)splashParticlesController.cancel();
     splash.classList.add('hide');
     setTimeout(function(){splash.style.display='none';afterSplash();},720);
   }
@@ -559,52 +525,16 @@ function afterSplash(){
   video.addEventListener('error',function(){});
 })();
 
-var setupTeacherParticlesId=null;
-function startSetupTeacherParticles(canvasId){
-  if(setupTeacherParticlesId!=null){cancelAnimationFrame(setupTeacherParticlesId);setupTeacherParticlesId=null;}
-  var canvas=document.getElementById(canvasId);
-  if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  resize();
-  window.addEventListener('resize',resize);
-  var particles=[];
-  function spawn(){
-    var W=canvas.width,H=canvas.height;
-    return{x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.12,vy:(Math.random()-0.5)*0.12,life:1,decay:0.002,size:1+Math.random()*1.8,hue:'255,255,255',wobble:Math.random()*Math.PI*2};
-  }
-  for(var i=0;i<80;i++)particles.push(spawn());
-  function draw(){
-    if(!canvas.width||!canvas.height){setupTeacherParticlesId=requestAnimationFrame(draw);return;}
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    var W=canvas.width,H=canvas.height;
-    particles.forEach(function(p,i){
-      p.wobble+=0.02;
-      p.vx+= (Math.random()-0.5)*0.015;
-      p.vy+= (Math.random()-0.5)*0.015;
-      p.vx=Math.max(-0.25,Math.min(0.25,p.vx));
-      p.vy=Math.max(-0.25,Math.min(0.25,p.vy));
-      p.x+=p.vx+Math.sin(p.wobble)*0.03;
-      p.y+=p.vy+Math.cos(p.wobble*0.7)*0.03;
-      if(p.x<0||p.x>W)p.vx*=-1;
-      if(p.y<0||p.y>H)p.vy*=-1;
-      p.x=Math.max(0,Math.min(W,p.x));
-      p.y=Math.max(0,Math.min(H,p.y));
-      p.life-=p.decay;
-      if(p.life<=0)particles[i]=spawn();
-      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-      ctx.fillStyle='rgba('+p.hue+','+(p.life*0.35).toFixed(2)+')';ctx.fill();
-    });
-    setupTeacherParticlesId=requestAnimationFrame(draw);
-  }
-  draw();
-}
+var particlesController=null;
 function show(id){
+  if(particlesController&&particlesController.cancel){particlesController.cancel();particlesController=null;}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id==='screen-setup')startSetupTeacherParticles('setup-particles');
-  else if(id==='screen-teacher')startSetupTeacherParticles('teacher-particles');
-  else if(setupTeacherParticlesId!=null){cancelAnimationFrame(setupTeacherParticlesId);setupTeacherParticlesId=null;}
+  if(window.startParticles){
+    if(id==='screen-setup')particlesController=startParticles('setup-particles','slowChaotic');
+    else if(id==='screen-teacher')particlesController=startParticles('teacher-particles','slowChaotic');
+    else if(id==='screen-teacher-code')particlesController=startParticles('teacher-code-particles','slowChaotic');
+  }
 }
 
 async function initTeacherEntry(){
@@ -881,32 +811,8 @@ function haversine(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-var studentParticlesAnimId=null;
 function startStudentParticles(){
-  var canvas=document.getElementById('student-particles');
-  if(!canvas)return;
-  var ctx=canvas.getContext('2d');
-  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  resize();
-  window.addEventListener('resize',resize);
-  var particles=[];
-  function spawn(){
-    var W=canvas.width,H=canvas.height;
-    return{x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.8,vy:-0.2-Math.random()*0.6,life:1,decay:0.004+Math.random()*0.008,size:1+Math.random()*2,hue:'255,255,255'};
-  }
-  for(var i=0;i<100;i++)particles.push(spawn());
-  function draw(){
-    if(!canvas.width||!canvas.height){studentParticlesAnimId=requestAnimationFrame(draw);return;}
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    particles.forEach(function(p,i){
-      p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;
-      if(p.life<=0||p.x<0||p.x>canvas.width||p.y<0||p.y>canvas.height)particles[i]=spawn();
-      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-      ctx.fillStyle='rgba('+p.hue+','+(p.life*0.8).toFixed(2)+')';ctx.fill();
-    });
-    studentParticlesAnimId=requestAnimationFrame(draw);
-  }
-  draw();
+  if(window.startParticles)window.startParticles('student-particles','student');
 }
 
 async function runCheck(){
