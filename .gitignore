@@ -1,0 +1,16 @@
+# Backend
+backend/node_modules/
+backend/.env
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
