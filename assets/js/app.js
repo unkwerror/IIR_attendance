@@ -44,15 +44,25 @@ function initSplash() {
   }
   const splashParticlesController = window.startParticles && window.startParticles('splash-canvas', 'splash');
   const SPLASH_MS = 3400;
+  const CROSSFADE_MS = 800;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
   function dismissSplash() {
     if (splashParticlesController && splashParticlesController.cancel) splashParticlesController.cancel();
-    splash.classList.add('hide');
+    const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
+    show(target);
+    requestAnimationFrame(() => {
+      splash.classList.add('hide');
+    });
     setTimeout(() => {
       splash.style.display = 'none';
-      afterSplash();
-    }, 720);
+      if (!window._appParticlesStarted && window.startParticles) {
+        window._appParticlesStarted = true;
+        window.startParticles('app-particles-canvas', 'slowChaotic');
+      }
+      if (target === 'screen-student') runCheck();
+      else initTeacherEntry();
+    }, CROSSFADE_MS);
   }
 
   let videoEnded = false;

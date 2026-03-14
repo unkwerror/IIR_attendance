@@ -22,11 +22,11 @@ export const config = {
     spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID
   },
   rateLimit: {
-    checkPerMinute: 120,
-    attendancesPerMinute: 60
+    checkPerMinute: 150,
+    attendancesPerMinute: 100
   },
   pool: {
-    max: 20,
+    max: 30,
     idleTimeoutMillis: 30000
   }
 };
