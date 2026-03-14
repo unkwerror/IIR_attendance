@@ -33,7 +33,6 @@ function afterSplash() {
 function initSplash() {
   const splash = document.getElementById('screen-splash');
   const progressFill = document.getElementById('splash-progress-fill');
-  const lottieEl = document.getElementById('splash-lottie');
   if (!splash) {
     afterSplash();
     return;
@@ -46,33 +45,10 @@ function initSplash() {
     window.startParticles('splash-particles-canvas', 'slowChaotic');
   }
 
-  let lottieInstance = null;
-  if (lottieEl && typeof lottie !== 'undefined') {
-    const animPath = 'assets/Animation - 1773478714376/animations/375f772d-9ece-465a-b91e-626b31e508a3.json';
-    const assetsPath = new URL('assets/Animation - 1773478714376/images/', new URL('.', window.location.href)).href;
-    fetch(animPath)
-      .then((r) => r.json())
-      .then((data) => {
-        lottieInstance = lottie.loadAnimation({
-          container: lottieEl,
-          renderer: 'svg',
-          loop: true,
-          autoplay: true,
-          animationData: data,
-          assetsPath: assetsPath,
-          rendererSettings: {
-            preserveAspectRatio: 'xMidYMid slice'
-          }
-        });
-      })
-      .catch(() => {});
-  }
-
   let splashDismissed = false;
   function dismissSplash() {
     if (splashDismissed) return;
     splashDismissed = true;
-    if (lottieInstance && lottieInstance.destroy) lottieInstance.destroy();
 
     const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
     show(target);
