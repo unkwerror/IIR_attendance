@@ -149,8 +149,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div class="neb n1"></div>
 <div class="neb n2"></div>
 
+<!-- Код преподавателя (секрет только на сервере, во фронте не хранится) -->
+<div class="screen" id="screen-teacher-code">
+  <div class="setup-card">
+    <div class="s-brand">
+      <div class="s-brand-dot"></div>
+      <div class="s-brand-txt">STARTUP<br>STUDIO <em>NSU</em></div>
+    </div>
+    <div class="setup-h">
+      <div class="setup-title">Вход для<br>преподавателя</div>
+      <div class="setup-sub">Введите код доступа, чтобы создать сессию отметки.</div>
+    </div>
+    <div class="fields">
+      <div class="field">
+        <label>Код преподавателя</label>
+        <input type="password" id="inp-teacher-code" placeholder="Введите код" autocomplete="off" />
+      </div>
+      <div id="teacher-code-err" class="geo-status err" style="display:none;margin-top:8px;"></div>
+    </div>
+    <button class="btn-go" onclick="submitTeacherCode()">ВОЙТИ</button>
+  </div>
+</div>
+
 <!-- SETUP -->
-<div class="screen active" id="screen-setup">
+<div class="screen" id="screen-setup">
   <div class="setup-card">
     <div class="s-brand">
       <div class="s-brand-dot"></div>
@@ -309,9 +331,42 @@ const uToken=P.get('t');
 const uSession=P.get('sid');
 
 if(uToken&&uSession){show('screen-student');runCheck();}
-else{show('screen-setup');}
+else{initTeacherEntry();}
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+
+async function initTeacherEntry(){
+  const token=sessionStorage.getItem('teacherToken');
+  if(!token){show('screen-teacher-code');return;}
+  try{
+    const r=await fetch(`${API_BASE}/api/check-teacher-token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+    if(r.ok){show('screen-setup');setTimeout(()=>{if(navigator.geolocation)captureGeo();},400);return;}
+  }catch(e){}
+  sessionStorage.removeItem('teacherToken');
+  show('screen-teacher-code');
+}
+
+async function submitTeacherCode(){
+  const inp=document.getElementById('inp-teacher-code');
+  const errEl=document.getElementById('teacher-code-err');
+  const code=(inp&&inp.value)?String(inp.value).trim():'';
+  if(!code){if(errEl){errEl.style.display='block';errEl.textContent='Введите код.';}return;}
+  if(errEl)errEl.style.display='none';
+  try{
+    const r=await fetch(`${API_BASE}/api/verify-teacher`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const data=await r.json();
+    if(!r.ok){
+      if(errEl){errEl.style.display='block';errEl.textContent=(data.error==='invalid_code')?'Неверный код.':'Ошибка сервера.';}
+      return;
+    }
+    if(data.token){sessionStorage.setItem('teacherToken',data.token);}
+    inp.value='';
+    show('screen-setup');
+    setTimeout(()=>{if(navigator.geolocation)captureGeo();},400);
+  }catch(e){
+    if(errEl){errEl.style.display='block';errEl.textContent='Нет связи с сервером.';}
+  }
+}
 
 let cfg={sessionId:null,interval:15},tLeft=15,ticker=null,attTimer=null;
 
@@ -376,13 +431,7 @@ function captureGeo(){
   }, {timeout:8000,maximumAge:0,enableHighAccuracy:true});
 }
 
-// Auto-trigger geo request on setup screen load so browser shows permission prompt immediately
-window.addEventListener('DOMContentLoaded',()=>{
-  if(!uT&&!uF){
-    // Small delay so page renders first, then trigger geo (required for iOS user-gesture rule bypass)
-    setTimeout(()=>{ if(navigator.geolocation) captureGeo(); },400);
-  }
-});
+// Геолокация запрашивается после входа преподавателя при показе экрана настройки (initTeacherEntry / submitTeacherCode)
 
 async function startSession(){
   const subject=document.getElementById('inp-subject').value.trim()||'Занятие';
@@ -397,11 +446,14 @@ async function startSession(){
     if(parts.length===2&&!isNaN(parts[0])&&!isNaN(parts[1])){geoLat=parts[0];geoLng=parts[1];geoTeacherAcc=teacherAcc;}
   }
 
+  const teacherToken=sessionStorage.getItem('teacherToken');
+  if(!teacherToken){show('screen-teacher-code');const errEl=document.getElementById('teacher-code-err');if(errEl){errEl.style.display='block';errEl.textContent='Сессия истекла. Введите код преподавателя снова.';}return;}
   try{
     const resp=await fetch(`${API_BASE}/api/sessions`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        teacherToken,
         subject,
         qrInterval:interval,
         geoLat,
@@ -411,8 +463,15 @@ async function startSession(){
         geoRequired:!!geoLat&&!!geoLng
       })
     });
-    if(!resp.ok){throw new Error('create');}
     const data=await resp.json();
+    if(resp.status===403&&(data.error==='teacher_required'||data.error==='invalid_or_expired')){
+      sessionStorage.removeItem('teacherToken');
+      show('screen-teacher-code');
+      const errEl=document.getElementById('teacher-code-err');
+      if(errEl){errEl.style.display='block';errEl.textContent='Сессия истекла. Введите код преподавателя снова.';}
+      return;
+    }
+    if(!resp.ok){throw new Error('create');}
     const s=data.session;
     cfg.sessionId=data.sessionId;
     cfg.interval=s.qrInterval||interval;

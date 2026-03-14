@@ -2,12 +2,43 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import pkg from 'pg';
 import { google } from 'googleapis';
 
 dotenv.config();
 
 const { Pool } = pkg;
+
+// === Код преподавателя: секрет только в env, в коде/фронте его нет ===
+const TEACHER_SECRET = process.env.TEACHER_SECRET || '';
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 часа
+const teacherTokens = new Map(); // token -> { expires }
+
+function cleanupExpiredTokens() {
+  const now = Date.now();
+  for (const [token, data] of teacherTokens.entries()) {
+    if (data.expires < now) teacherTokens.delete(token);
+  }
+}
+
+function constantTimeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) {
+    Buffer.from(b, 'utf8'); // dummy to keep constant time
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function isTeacherTokenValid(token) {
+  if (!token || typeof token !== 'string') return false;
+  cleanupExpiredTokens();
+  const data = teacherTokens.get(token);
+  return data && data.expires > Date.now();
+}
 
 // DATABASE_URL должен указывать на PostgreSQL (Supabase/Neon/Railway)
 // пример: postgres://user:pass@host:5432/dbname
@@ -96,6 +127,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Проверка кода преподавателя — код только на сервере, constant-time сравнение
+app.post('/api/verify-teacher', (req, res) => {
+  const code = (req.body && req.body.code) ? String(req.body.code).trim() : '';
+  if (!TEACHER_SECRET) {
+    return res.status(503).json({ error: 'teacher_auth_not_configured' });
+  }
+  if (!constantTimeCompare(code, TEACHER_SECRET)) {
+    return res.status(401).json({ error: 'invalid_code' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  teacherTokens.set(token, { expires: Date.now() + TOKEN_TTL_MS });
+  res.json({ ok: true, token });
+});
+
+// Проверка токена (чтобы после перезагрузки не вводить код снова)
+app.post('/api/check-teacher-token', (req, res) => {
+  const token = (req.body && req.body.token) ? String(req.body.token) : '';
+  if (!isTeacherTokenValid(token)) {
+    return res.status(401).json({ error: 'invalid_or_expired' });
+  }
+  res.json({ ok: true });
+});
+
 function genId(len = 24) {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let out = '';
@@ -105,8 +159,16 @@ function genId(len = 24) {
   return out;
 }
 
-// Создание сессии преподавателем
+// Создание сессии преподавателем (только с валидным токеном преподавателя)
 app.post('/api/sessions', async (req, res) => {
+  const teacherToken = req.body && req.body.teacherToken;
+  if (!TEACHER_SECRET) {
+    return res.status(503).json({ error: 'teacher_auth_not_configured' });
+  }
+  if (!isTeacherTokenValid(teacherToken)) {
+    return res.status(403).json({ error: 'teacher_required' });
+  }
+
   const {
     subject,
     qrInterval,
