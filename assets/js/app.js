@@ -42,7 +42,11 @@ function initSplash() {
   const CROSSFADE_MS = 700;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
+  let splashDismissed = false;
   function dismissSplash() {
+    if (splashDismissed) return;
+    splashDismissed = true;
+
     const target = (uToken && uSession) ? 'screen-student' : 'screen-teacher-code';
     show(target);
     requestAnimationFrame(() => {
@@ -89,20 +93,7 @@ function initStars() {
   }
 }
 
-async function initTeacherEntry() {
-  const token = auth.getTeacherToken();
-  if (!token) {
-    show('screen-teacher-code');
-    return;
-  }
-  try {
-    const { response } = await api.checkTeacherToken(token);
-    if (response.ok) {
-      show('screen-setup');
-      return;
-    }
-  } catch (e) {}
-  auth.clearTeacherToken();
+function initTeacherEntry() {
   show('screen-teacher-code');
 }
 
