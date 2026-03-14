@@ -1,0 +1,6 @@
+.env DATABASE_URL=..
+GOOGLE_SHEETS_CREDENTIALS=..
+GOOGLE_SHEETS_SPREADSHEET_ID=...
+
+node scripts/cleanup-attendances.js --dry-run --config scripts/cleanup-config.json
+node scripts/cleanup-attendances.js --execute --config scripts/cleanup-config.json
