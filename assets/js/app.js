@@ -45,21 +45,17 @@ function initSplash() {
   let lottieInstance = null;
   if (lottieEl && typeof lottie !== 'undefined') {
     const animPath = 'assets/Animation - 1773478714376/animations/375f772d-9ece-465a-b91e-626b31e508a3.json';
-    const assetsBase = 'assets/Animation - 1773478714376/images/';
+    const assetsPath = new URL('assets/Animation - 1773478714376/images/', new URL('.', window.location.href)).href;
     fetch(animPath)
       .then((r) => r.json())
       .then((data) => {
-        if (data.assets && Array.isArray(data.assets)) {
-          data.assets.forEach((a) => {
-            if (a.u === '/images/') a.u = assetsBase;
-          });
-        }
         lottieInstance = lottie.loadAnimation({
           container: lottieEl,
           renderer: 'svg',
           loop: true,
           autoplay: true,
-          animationData: data
+          animationData: data,
+          assetsPath: assetsPath
         });
       })
       .catch(() => {});
