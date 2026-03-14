@@ -42,6 +42,10 @@ function initSplash() {
   const CROSSFADE_MS = 700;
   if (progressFill) progressFill.style.setProperty('--splash-duration', (SPLASH_MS / 1000) + 's');
 
+  if (typeof window.startParticles === 'function') {
+    window.startParticles('splash-particles-canvas', 'slowChaotic');
+  }
+
   let lottieInstance = null;
   if (lottieEl && typeof lottie !== 'undefined') {
     const animPath = 'assets/Animation - 1773478714376/animations/375f772d-9ece-465a-b91e-626b31e508a3.json';
@@ -55,7 +59,10 @@ function initSplash() {
           loop: true,
           autoplay: true,
           animationData: data,
-          assetsPath: assetsPath
+          assetsPath: assetsPath,
+          rendererSettings: {
+            preserveAspectRatio: 'xMidYMid slice'
+          }
         });
       })
       .catch(() => {});

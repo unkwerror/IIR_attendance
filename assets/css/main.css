@@ -14,8 +14,11 @@ body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-hei
 .screen.active{opacity:1;visibility:visible;pointer-events:auto;}
 #screen-splash{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;transition:opacity .55s ease-out;transform:translateZ(0);}
 #screen-splash.hide{opacity:0;pointer-events:none;}
-.splash-center{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.splash-lottie{width:min(200px,50vw);height:min(200px,50vw);}
+.splash-center{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;}
+.splash-particles{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;}
+.splash-lottie-crop{position:relative;width:100%;height:100%;overflow:hidden;clip-path:inset(0 0 8% 0);}
+.splash-lottie{width:100%;height:100%;}
+.splash-lottie svg{width:100%!important;height:100%!important;object-fit:cover;}
 .splash-progress{position:absolute;bottom:0;left:0;right:0;height:2px;z-index:5;background:rgba(255,255,255,.05);overflow:hidden;}
 .splash-progress-fill{height:100%;width:0;background:linear-gradient(90deg,transparent,var(--pk),transparent);animation:splashProgress var(--splash-duration,3.2s) linear forwards;}
 @keyframes splashProgress{to{width:100%;}}

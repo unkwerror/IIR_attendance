@@ -16,10 +16,13 @@
 <div class="neb n2"></div>
 <canvas id="app-particles-canvas" class="app-particles-layer" aria-hidden="true"></canvas>
 
-<!-- Splash: тёмный фон, частицы с загрузки, Lottie по центру -->
+<!-- Splash: тёмный фон, белые частицы, Lottie на весь экран (низ обрезан) -->
 <div id="screen-splash">
+  <canvas id="splash-particles-canvas" class="splash-particles" aria-hidden="true"></canvas>
   <div class="splash-center">
-    <div id="splash-lottie" class="splash-lottie" aria-hidden="true"></div>
+    <div class="splash-lottie-crop">
+      <div id="splash-lottie" class="splash-lottie" aria-hidden="true"></div>
+    </div>
   </div>
   <div class="splash-progress"><div class="splash-progress-fill" id="splash-progress-fill"></div></div>
 </div>
