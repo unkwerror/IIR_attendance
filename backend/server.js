@@ -28,7 +28,10 @@ const corsOptions = allowedOrigins.size === 0
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({
+  type: ['application/json', 'application/*+json', 'text/plain'],
+  limit: '256kb'
+}));
 
 app.use(healthRoutes);
 app.use(authRoutes);

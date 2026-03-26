@@ -32,22 +32,20 @@ function requireTeacher(req, res) {
 
 router.post('/api/sessions', async (req, res) => {
   if (!requireTeacher(req, res)) return;
-  const {
-    subject,
-    qrInterval,
-    fingerprintRequired = true
-  } = req.body || {};
-  if (!subject) {
-    return res.status(400).json({ error: 'subject обязателен' });
-  }
-  const subjectStr = String(subject).trim();
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const subjectRaw = body.subject;
+  const qrIntervalRaw = body.qrInterval;
+  const fingerprintRequired = body.fingerprintRequired !== undefined
+    ? body.fingerprintRequired
+    : true;
+  const subjectStr = String(subjectRaw || '').trim() || 'Занятие';
   if (subjectStr.length > config.subjectMaxLength) {
     return res.status(400).json({ error: 'subject слишком длинное' });
   }
   const sessionId = genId(16);
   const qrIntervalCap = Math.min(
     config.qrTokenLifetimeSec.max,
-    Math.max(config.qrTokenLifetimeSec.min, Number(qrInterval) || 15)
+    Math.max(config.qrTokenLifetimeSec.min, Number(qrIntervalRaw) || 15)
   );
   try {
     const { rows } = await pool.query(
