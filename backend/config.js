@@ -1,32 +1,52 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+function toInt(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+function toList(value) {
+  return String(value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const config = {
-  port: Number(process.env.PORT) || 4000,
+  port: toInt(process.env.PORT, 4000),
   databaseUrl: process.env.DATABASE_URL,
   pgSsl: process.env.PGSSLMODE === 'disable',
+  trustProxy: process.env.TRUST_PROXY !== 'false',
+  corsAllowedOrigins: toList(process.env.CORS_ALLOWED_ORIGINS),
   teacherSecret: process.env.TEACHER_SECRET || '',
   tokenTtlMs: 24 * 60 * 60 * 1000,
   verifyRateWindowMs: 15 * 60 * 1000,
-  verifyMaxAttempts: 5,
-  maxDevicesPerQr: 45,
+  verifyMaxAttempts: toInt(process.env.VERIFY_MAX_ATTEMPTS, 5),
+  maxDevicesPerQr: toInt(process.env.MAX_DEVICES_PER_QR, 250),
   qrTokenLifetimeSec: { min: 5, max: 30 },
-  oneTimeTokenTtlMs: 10 * 60 * 1000,
+  oneTimeTokenTtlMs: toInt(process.env.ONE_TIME_TOKEN_TTL_MS, 10 * 60 * 1000),
   subjectMaxLength: 300,
   studentNameMaxLength: 200,
   studentGroupMaxLength: 80,
   fingerprintMaxLength: 500,
+  geoEnforced: process.env.GEO_ENFORCED === 'true',
   localTz: process.env.LOCAL_TZ || 'Asia/Novosibirsk',
   googleSheets: {
     credentials: process.env.GOOGLE_SHEETS_CREDENTIALS,
     spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID
   },
   rateLimit: {
-    checkPerMinute: 150,
-    attendancesPerMinute: 100
+    checkPerMinute: toInt(process.env.RATE_LIMIT_CHECK_PER_MINUTE, 800),
+    attendancesPerMinute: toInt(process.env.RATE_LIMIT_ATTENDANCES_PER_MINUTE, 500)
   },
   pool: {
-    max: 30,
-    idleTimeoutMillis: 30000
+    max: toInt(process.env.POOL_MAX, 30),
+    idleTimeoutMillis: toInt(process.env.POOL_IDLE_TIMEOUT_MS, 30000)
+  },
+  maintenance: {
+    enabled: process.env.MAINTENANCE_ENABLED !== 'false',
+    cleanupEveryMs: toInt(process.env.MAINTENANCE_CLEANUP_EVERY_MS, 60000),
+    cleanupBatchSize: toInt(process.env.MAINTENANCE_CLEANUP_BATCH_SIZE, 5000)
   }
 };

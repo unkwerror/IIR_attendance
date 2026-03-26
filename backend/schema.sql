@@ -31,9 +31,19 @@ create table if not exists attendances (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_attendances_session_id on attendances(session_id);
-create index if not exists idx_attendances_session_fp on attendances(session_id, fingerprint);
-
 -- Миграция: лимит устройств на один QR-код (защита от пересылки ссылки)
 alter table qr_tokens add column if not exists parent_qr_token text;
+
+create index if not exists idx_attendances_session_id on attendances(session_id);
+create index if not exists idx_attendances_session_fp on attendances(session_id, fingerprint);
+create index if not exists idx_qr_tokens_parent_one_time on qr_tokens(parent_qr_token) where is_one_time = true;
+create index if not exists idx_qr_tokens_session_one_time_expires on qr_tokens(session_id, is_one_time, expires_at);
+
+-- Защита от дублей при конкурентных вставках
+create unique index if not exists uq_attendances_session_fingerprint on attendances(session_id, fingerprint);
+create unique index if not exists uq_attendances_session_student_lower
+  on attendances(session_id, lower(student_name), lower(student_group));
+create unique index if not exists uq_qr_tokens_session_parent_fingerprint
+  on qr_tokens(session_id, parent_qr_token, fingerprint)
+  where is_one_time = true and parent_qr_token is not null;
 

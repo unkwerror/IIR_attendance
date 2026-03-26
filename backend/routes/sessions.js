@@ -6,22 +6,36 @@ import { config } from '../config.js';
 
 const router = Router();
 
-router.post('/api/sessions', async (req, res) => {
-  const teacherToken = req.body?.teacherToken;
+function getTeacherToken(req) {
+  const authHeader = req.get('authorization');
+  if (typeof authHeader === 'string') {
+    const m = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (m && m[1]) return m[1].trim();
+  }
+  if (req.body?.teacherToken) return String(req.body.teacherToken);
+  if (req.query?.teacherToken) return String(req.query.teacherToken);
+  return '';
+}
+
+function requireTeacher(req, res) {
   if (!authService.isTeacherAuthConfigured()) {
-    return res.status(503).json({ error: 'teacher_auth_not_configured' });
+    res.status(503).json({ error: 'teacher_auth_not_configured' });
+    return false;
   }
+  const teacherToken = getTeacherToken(req);
   if (!authService.isTeacherTokenValid(teacherToken)) {
-    return res.status(403).json({ error: 'teacher_required' });
+    res.status(403).json({ error: 'teacher_required' });
+    return false;
   }
+  return true;
+}
+
+router.post('/api/sessions', async (req, res) => {
+  if (!requireTeacher(req, res)) return;
   const {
     subject,
     qrInterval,
-    geoLat,
-    geoLng,
-    geoRadius,
-    fingerprintRequired = true,
-    geoRequired = false
+    fingerprintRequired = true
   } = req.body || {};
   if (!subject || !qrInterval) {
     return res.status(400).json({ error: 'subject и qrInterval обязательны' });
@@ -45,11 +59,11 @@ router.post('/api/sessions', async (req, res) => {
         sessionId,
         subjectStr,
         qrIntervalCap,
-        geoLat ?? null,
-        geoLng ?? null,
-        geoRadius != null ? Number(geoRadius) : null,
+        null,
+        null,
+        null,
         !!fingerprintRequired,
-        !!geoRequired
+        false
       ]
     );
     const s = rows[0];
@@ -75,6 +89,7 @@ router.post('/api/sessions', async (req, res) => {
 });
 
 router.post('/api/sessions/:id/qr-token', async (req, res) => {
+  if (!requireTeacher(req, res)) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -104,6 +119,7 @@ router.post('/api/sessions/:id/qr-token', async (req, res) => {
 });
 
 router.get('/api/sessions/:id/attendances', async (req, res) => {
+  if (!requireTeacher(req, res)) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -130,6 +146,7 @@ router.get('/api/sessions/:id/attendances', async (req, res) => {
 });
 
 router.post('/api/sessions/:id/end', async (req, res) => {
+  if (!requireTeacher(req, res)) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {

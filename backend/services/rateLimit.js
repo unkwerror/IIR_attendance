@@ -2,8 +2,9 @@ import { config } from '../config.js';
 
 const store = new Map();
 
-function key(name, ip) {
-  return `${name}:${ip}`;
+function key(name, ip, scope = '') {
+  const scopePart = scope ? String(scope) : '-';
+  return `${name}:${ip}:${scopePart}`;
 }
 
 function clean(name) {
@@ -42,32 +43,21 @@ export function recordVerifyAttempt(ip, success) {
   rec.count += 1;
 }
 
-const limiters = new Map();
-
-function getLimiter(name, maxPerMinute) {
-  if (!limiters.has(name)) {
-    limiters.set(name, { max: maxPerMinute, storeKey: (ip) => key(name, ip) });
-  }
-  return limiters.get(name);
-}
-
-export function checkGenericLimit(name, ip, maxPerMinute) {
+export function checkGenericLimit(name, ip, maxPerMinute, scope = '') {
   clean(name);
-  const lim = getLimiter(name, maxPerMinute);
-  const k = lim.storeKey(ip);
+  const k = key(name, ip, scope);
   const rec = store.get(k);
   const now = Date.now();
-  const windowStart = now - 60000;
   if (!rec) return true;
-  if (rec.resetAt < windowStart) {
+  if (now >= rec.resetAt) {
     store.delete(k);
     return true;
   }
   return rec.count < maxPerMinute;
 }
 
-export function recordGenericLimit(name, ip) {
-  const k = key(name, ip);
+export function recordGenericLimit(name, ip, scope = '') {
+  const k = key(name, ip, scope);
   const now = Date.now();
   let rec = store.get(k);
   if (!rec || rec.resetAt < now) {

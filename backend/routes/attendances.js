@@ -9,18 +9,20 @@ const router = Router();
 const LIMIT_NAME = 'api-attendances';
 
 router.post('/api/attendances', async (req, res) => {
+  const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  if (!checkGenericLimit(LIMIT_NAME, ip, config.rateLimit.attendancesPerMinute)) {
+  const rateScope = `${sessionId || 'unknown'}:${fingerprint || 'unknown'}`;
+  if (!checkGenericLimit(LIMIT_NAME, ip, config.rateLimit.attendancesPerMinute, rateScope)) {
     return res.status(429).json({ error: 'too_many_requests' });
   }
-  recordGenericLimit(LIMIT_NAME, ip);
-
-  const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup } = req.body || {};
+  recordGenericLimit(LIMIT_NAME, ip, rateScope);
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
     return res.status(400).json({ error: 'required fields missing' });
   }
   const name = String(studentName).trim();
   const group = String(studentGroup).trim();
+  const normalizedName = name.toLowerCase();
+  const normalizedGroup = group.toLowerCase();
   if (name.length < 1 || name.length > config.studentNameMaxLength) {
     return res.status(400).json({ error: 'studentName: длина 1–200 символов' });
   }
@@ -42,23 +44,30 @@ router.post('/api/attendances', async (req, res) => {
       if (sRows[0]) sessionSubject = sRows[0].subject || '';
     } catch (_) {}
 
-    const { rows: tokRows } = await pool.query(
-      `select token, session_id, expires_at, fingerprint from qr_tokens
-       where token = $1 and session_id = $2 and is_one_time = true`,
-      [oneTimeToken, sessionId]
-    );
-    const tokenInfo = tokRows[0];
-    if (!tokenInfo || tokenInfo.fingerprint !== fingerprint) {
-      return res.status(400).json({ error: 'invalid oneTimeToken' });
-    }
-    if (new Date() > tokenInfo.expires_at) {
-      return res.status(400).json({ error: 'oneTimeToken expired' });
-    }
-
     const id = genId(18);
     const client = await pool.connect();
     try {
       await client.query('begin');
+      await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9301, `${sessionId}:${fingerprint}`]);
+      await client.query(
+        'select pg_advisory_xact_lock($1, hashtext($2))',
+        [9302, `${sessionId}:${normalizedName}:${normalizedGroup}`]
+      );
+      const { rows: tokRows } = await client.query(
+        `select token, expires_at, fingerprint from qr_tokens
+         where token = $1 and session_id = $2 and is_one_time = true
+         for update`,
+        [oneTimeToken, sessionId]
+      );
+      const tokenInfo = tokRows[0];
+      if (!tokenInfo || tokenInfo.fingerprint !== fingerprint) {
+        await client.query('rollback');
+        return res.status(400).json({ error: 'invalid oneTimeToken' });
+      }
+      if (new Date() > tokenInfo.expires_at) {
+        await client.query('rollback');
+        return res.status(400).json({ error: 'oneTimeToken expired' });
+      }
       const { rows: existFp } = await client.query(
         `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
         [sessionId, fingerprint]
@@ -108,6 +117,9 @@ router.post('/api/attendances', async (req, res) => {
       });
     } catch (e) {
       await client.query('rollback');
+      if (e.code === '23505') {
+        return res.status(403).json({ error: 'already_marked' });
+      }
       throw e;
     } finally {
       client.release();

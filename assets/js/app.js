@@ -8,7 +8,6 @@ import * as auth from './auth.js';
 
 const uToken = urlParams.token;
 const uSession = urlParams.session;
-const uGeo = urlParams.geo;
 
 let cfg = { sessionId: null, interval: 15 };
 let tLeft = 15;
@@ -150,69 +149,9 @@ async function submitTeacherCode() {
   }
 }
 
-function captureGeo() {
-  const st = document.getElementById('geo-status');
-  const inp = document.getElementById('inp-geo');
-  st.className = 'geo-status';
-  st.innerHTML = '<span class="geo-dot"></span>Определяем координаты…';
-  if (!navigator.geolocation) {
-    st.className = 'geo-status err';
-    st.innerHTML = '<span class="geo-dot"></span>Геолокация не поддерживается браузером';
-    return;
-  }
-  let resolved = false;
-  function applyPosition(pos) {
-    if (resolved) return;
-    resolved = true;
-    const lat = pos.coords.latitude.toFixed(6);
-    const lng = pos.coords.longitude.toFixed(6);
-    const acc = Math.round(pos.coords.accuracy);
-    inp.value = `${lat}, ${lng}`;
-    inp.dataset.acc = acc;
-    const radSlider = document.getElementById('inp-radius');
-    const radVal = document.getElementById('radius-val');
-    const suggested = Math.min(300, Math.max(80, Math.round(acc * 0.15) + 80));
-    radSlider.value = suggested;
-    radVal.textContent = suggested + 'м';
-    const accLabel = acc < 50 ? 'GPS' : acc < 500 ? 'WiFi' : 'IP-геолокация';
-    const isUnreliable = acc > 500;
-    st.className = 'geo-status ' + (isUnreliable ? 'err' : 'ok');
-    if (isUnreliable) {
-      st.innerHTML = `<span class="geo-dot"></span>⚠ ${accLabel}, ±${acc} м — геопроверка будет отключена (слишком низкая точность). Защита только по fingerprint.`;
-    } else {
-      st.innerHTML = `<span class="geo-dot"></span>Зафиксировано ✓ (${accLabel}, ±${acc} м → радиус ${suggested} м)`;
-    }
-  }
-  function onError(err) {
-    if (resolved) return;
-    resolved = true;
-    st.className = 'geo-status err';
-    const msg = err.code === 1
-      ? 'Доступ запрещён. Разрешите геолокацию в настройках браузера, затем нажмите ⊕ снова.'
-      : err.code === 3
-        ? 'Нет ответа. Проверьте, что геолокация включена в системе.'
-        : 'Геолокация недоступна на этом устройстве.';
-    st.innerHTML = `<span class="geo-dot"></span>${msg}`;
-  }
-  navigator.geolocation.getCurrentPosition(applyPosition, (err) => {
-    if (err.code === 1) { onError(err); return; }
-    navigator.geolocation.getCurrentPosition(applyPosition, onError, { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false });
-  }, { timeout: 8000, maximumAge: 0, enableHighAccuracy: true });
-}
-
 async function startSession() {
   const subject = document.getElementById('inp-subject').value.trim() || 'Занятие';
   const interval = parseInt(document.getElementById('inp-interval').value, 10) || 15;
-  const geoRaw = document.getElementById('inp-geo').value.trim();
-  const radius = parseInt(document.getElementById('inp-radius').value, 10) || 80;
-  let geoLat = null, geoLng = null;
-  if (geoRaw) {
-    const parts = geoRaw.split(',').map((s) => parseFloat(s.trim()));
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      geoLat = parts[0];
-      geoLng = parts[1];
-    }
-  }
   const teacherToken = auth.getTeacherToken();
   if (!teacherToken) {
     show('screen-teacher-code');
@@ -226,11 +165,7 @@ async function startSession() {
       teacherToken,
       subject,
       qrInterval: interval,
-      geoLat,
-      geoLng,
-      geoRadius: radius,
-      fingerprintRequired: true,
-      geoRequired: !!(geoLat && geoLng)
+      fingerprintRequired: true
     });
     if (response.status === 403 && (data.error === 'teacher_required' || data.error === 'invalid_or_expired')) {
       auth.clearTeacherToken();
@@ -244,11 +179,10 @@ async function startSession() {
     const s = data.session;
     cfg.sessionId = data.sessionId;
     cfg.interval = s.qrInterval || interval;
-    cfg.geoRequired = !!s.geoRequired;
     document.getElementById('lbl-subject').textContent = s.subject;
     document.getElementById('info-ivl').textContent = `${cfg.interval} сек`;
     const geoChip = document.getElementById('info-geo');
-    if (geoChip) geoChip.textContent = (s.geoLat != null) ? 'Geo + FP' : 'Fingerprint';
+    if (geoChip) geoChip.textContent = 'Fingerprint';
     show('screen-teacher');
     document.getElementById('att-box').style.display = 'block';
     genQR();
@@ -261,15 +195,24 @@ async function startSession() {
 
 async function genQR() {
   if (!cfg.sessionId) return;
+  const teacherToken = auth.getTeacherToken();
+  if (!teacherToken) return;
   try {
-    const { response, data } = await api.getQrToken(cfg.sessionId, cfg.interval);
+    const { response, data } = await api.getQrToken(cfg.sessionId, cfg.interval, teacherToken);
+    if (response.status === 403 && data.error === 'teacher_required') {
+      auth.clearTeacherToken();
+      show('screen-teacher-code');
+      const e = document.getElementById('teacher-code-err-txt'), w = document.getElementById('teacher-code-err');
+      if (e) e.textContent = 'Сессия истекла. Введите код преподавателя снова.';
+      if (w) w.classList.add('visible');
+      return;
+    }
     if (!response.ok) throw new Error('qr');
     const token = data.token;
     const tok = document.getElementById('info-tok');
     if (tok) tok.textContent = token.slice(0, 8) + '…';
     const base = location.origin + location.pathname;
-    let url = `${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
-    if (cfg.geoRequired) url += '&g=1';
+    const url = `${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
     renderQR(url);
   } catch (e) {
     alert('Не удалось получить QR‑токен с сервера.');
@@ -311,12 +254,6 @@ function renderQR(text) {
 function newSession() {
   if (ticker) clearInterval(ticker);
   show('screen-setup');
-  const inp = document.getElementById('inp-geo');
-  const st = document.getElementById('geo-status');
-  if (inp && inp.value) {
-    st.className = 'geo-status ok';
-    st.innerHTML = '<span class="geo-dot"></span>Координаты сохранены с прошлой сессии. Нажмите ⊕ чтобы обновить.';
-  }
 }
 
 function startTimer() {
@@ -458,36 +395,11 @@ async function runCheck() {
     } catch (_) {}
   }
 
-  let lat = null, lng = null;
-  if (uGeo && navigator.geolocation) {
-    st.innerHTML = `
-      <div class="st-icon spin"><div class="spin-r"></div></div>
-      <div class="st-title spin">Проверяем геолокацию…</div>
-      <div class="st-desc">Разрешите доступ к местоположению</div>`;
-    try {
-      const pos = await new Promise((res, rej) =>
-        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000, maximumAge: 0, enableHighAccuracy: true })
-      );
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    } catch (e) {
-      if (e.code === 1) return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции в настройках браузера и попробуйте снова.');
-      if (e.code === 3) return showFail('📍', 'Геолокация недоступна', 'Не удалось определить местоположение. Попробуйте у окна или на улице.');
-      return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.');
-    }
-    st.innerHTML = `
-      <div class="st-icon spin"><div class="spin-r"></div></div>
-      <div class="st-title spin">Проверяем устройство…</div>
-      <div class="st-desc">Секунду — идёт проверка</div>`;
-  }
-
   try {
     const { response, data } = await api.checkAccess({
       sessionId: uSession,
       token: uToken,
-      fingerprint: fp,
-      geoLat: lat,
-      geoLng: lng
+      fingerprint: fp
     });
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
@@ -527,7 +439,7 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
         </button>
         <div id="att-form-err" role="alert" style="display:none;color:var(--dn);font-size:12px;margin-top:4px;"></div>
       </form>
-      <div class="st-tag ok" style="margin-top:8px;">Сессия: ${session.subject || 'Занятие'}</div>
+      <div class="st-tag ok" style="margin-top:8px;">Сессия: ${esc(session.subject || 'Занятие')}</div>
     </div>`;
 
   const form = document.getElementById('att-form');
@@ -592,8 +504,18 @@ function startAttendancePolling() {
   const box = document.getElementById('att-box');
   if (box) box.style.display = 'block';
   const load = async () => {
+    const teacherToken = auth.getTeacherToken();
+    if (!teacherToken) return;
     try {
-      const { response, data } = await api.getAttendances(cfg.sessionId);
+      const { response, data } = await api.getAttendances(cfg.sessionId, teacherToken);
+      if (response.status === 403 && data.error === 'teacher_required') {
+        auth.clearTeacherToken();
+        show('screen-teacher-code');
+        const e = document.getElementById('teacher-code-err-txt'), w = document.getElementById('teacher-code-err');
+        if (e) e.textContent = 'Сессия истекла. Введите код преподавателя снова.';
+        if (w) w.classList.add('visible');
+        return;
+      }
       if (!response.ok) return;
       const listEl = document.getElementById('att-list');
       const cnt = document.getElementById('att-count');
@@ -628,6 +550,5 @@ window.show = show;
 window.onTeacherCodeInput = onTeacherCodeInput;
 window.toggleTeacherCodeVis = toggleTeacherCodeVis;
 window.submitTeacherCode = submitTeacherCode;
-window.captureGeo = captureGeo;
 window.startSession = startSession;
 window.newSession = newSession;

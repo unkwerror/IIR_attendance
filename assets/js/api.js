@@ -13,6 +13,17 @@ async function request(endpoint, options = {}) {
   return { response: res, data };
 }
 
+function withTeacherAuth(token, options = {}) {
+  if (!token) return options;
+  return {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`
+    }
+  };
+}
+
 export async function checkTeacherToken(token) {
   return request('/api/check-teacher-token', { method: 'POST', body: JSON.stringify({ token }) });
 }
@@ -22,14 +33,17 @@ export async function verifyTeacher(code) {
 }
 
 export async function createSession(body) {
-  return request('/api/sessions', { method: 'POST', body: JSON.stringify(body) });
+  return request('/api/sessions', withTeacherAuth(body?.teacherToken, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  }));
 }
 
-export async function getQrToken(sessionId, lifetimeSec) {
-  return request(`/api/sessions/${sessionId}/qr-token`, {
+export async function getQrToken(sessionId, lifetimeSec, teacherToken) {
+  return request(`/api/sessions/${sessionId}/qr-token`, withTeacherAuth(teacherToken, {
     method: 'POST',
     body: JSON.stringify({ lifetimeSec })
-  });
+  }));
 }
 
 export async function checkAccess(body) {
@@ -40,6 +54,6 @@ export async function submitAttendance(body) {
   return request('/api/attendances', { method: 'POST', body: JSON.stringify(body) });
 }
 
-export async function getAttendances(sessionId) {
-  return request(`/api/sessions/${sessionId}/attendances`);
+export async function getAttendances(sessionId, teacherToken) {
+  return request(`/api/sessions/${sessionId}/attendances`, withTeacherAuth(teacherToken));
 }

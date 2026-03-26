@@ -16,6 +16,5 @@ export function getParams() {
 const P = getParams();
 export const urlParams = {
   token: P.get('t'),
-  session: P.get('sid'),
-  geo: P.get('g')
+  session: P.get('sid')
 };

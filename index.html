@@ -103,20 +103,8 @@
       </div>
 
       <div class="geo-section">
-        <div class="geo-section-lbl">📍 Геолокация аудитории (рекомендуется: только в аудитории смогут отметиться)</div>
-        <div class="geo-row">
-          <div class="field">
-            <label>Координаты аудитории</label>
-            <input type="text" id="inp-geo" placeholder="54.8442, 83.0905" readonly />
-          </div>
-          <button class="btn-geo" onclick="captureGeo()" title="Определить моё местоположение">⊕</button>
-        </div>
-        <div class="geo-status" id="geo-status"><span class="geo-dot"></span>Не задано — геозащита отключена</div>
-        <div class="geo-radius-row">
-          <label>Допустимый радиус:</label>
-          <input type="range" id="inp-radius" min="20" max="300" value="80" step="10" oninput="document.getElementById('radius-val').textContent=this.value+'м'"/>
-          <span class="radius-val" id="radius-val">80м</span>
-        </div>
+        <div class="geo-section-lbl">📍 Геолокация отключена</div>
+        <div class="geo-status"><span class="geo-dot"></span>В этой версии отметка работает только по QR и fingerprint.</div>
       </div>
     </div>
     <button class="btn-go" onclick="startSession()">ЗАПУСТИТЬ СЕССИЮ →</button>
