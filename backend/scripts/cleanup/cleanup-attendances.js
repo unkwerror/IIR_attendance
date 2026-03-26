@@ -123,7 +123,7 @@ async function cleanupSheets(allowedSubjects, sheetName, dryRun) {
   const c = getSheetsClient();
   if (!c) {
     console.warn('\n--- Google Таблица ---');
-    console.warn('GOOGLE_SHEETS_CREDENTIALS или GOOGLE_SHEETS_SPREADSHEET_ID не заданы, пропуск.');
+    console.warn('GOOGLE_SHEETS_CREDENTIALS / GOOGLE_SHEETS_SPREADSHEET_ID не заданы или невалидны, пропуск.');
     return { deletedRows: 0 };
   }
 

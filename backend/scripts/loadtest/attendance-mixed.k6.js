@@ -34,7 +34,11 @@ function safeJson(response) {
 function postJson(url, body, extra = {}) {
   const headers = { ...jsonHeaders, ...(extra.headers || {}) };
   const tags = extra.tags || {};
-  return http.post(url, JSON.stringify(body), { headers, tags });
+  const requestOptions = { headers, tags };
+  if (Array.isArray(extra.expectedStatuses) && extra.expectedStatuses.length > 0) {
+    requestOptions.responseCallback = http.expectedStatuses(...extra.expectedStatuses);
+  }
+  return http.post(url, JSON.stringify(body), requestOptions);
 }
 
 function shouldTryDuplicate() {
@@ -47,21 +51,21 @@ function createQrToken(sessionId, authHeaders) {
   const res = postJson(
     `${BASE_URL}/api/sessions/${sessionId}/qr-token`,
     { lifetimeSec: QR_LIFETIME_SEC },
-    { headers: authHeaders, tags: { name: 'create_qr_token' } }
+    { headers: authHeaders, tags: { name: 'create_qr_token' }, expectedStatuses: [201] }
   );
   return { res, data: safeJson(res) };
 }
 
-function apiCheck(sessionId, token, fingerprint) {
+function apiCheck(sessionId, token, fingerprint, expectedStatuses = [200]) {
   const res = postJson(
     `${BASE_URL}/api/check`,
     { sessionId, token, fingerprint },
-    { tags: { name: 'api_check' } }
+    { tags: { name: 'api_check' }, expectedStatuses }
   );
   return { res, data: safeJson(res) };
 }
 
-function apiAttendance(sessionId, oneTimeToken, fingerprint, suffix = '') {
+function apiAttendance(sessionId, oneTimeToken, fingerprint, suffix = '', expectedStatuses = [201]) {
   const res = postJson(
     `${BASE_URL}/api/attendances`,
     {
@@ -71,7 +75,7 @@ function apiAttendance(sessionId, oneTimeToken, fingerprint, suffix = '') {
       studentName: `Mixed User ${__VU}${suffix}`,
       studentGroup: `K6-MIX-${String((__VU % 20) + 1).padStart(2, '0')}`
     },
-    { tags: { name: 'api_attendance' } }
+    { tags: { name: 'api_attendance' }, expectedStatuses }
   );
   return { res, data: safeJson(res) };
 }
@@ -99,7 +103,7 @@ export function setup() {
   const verifyRes = postJson(
     `${BASE_URL}/api/verify-teacher`,
     { code: TEACHER_CODE },
-    { tags: { name: 'verify_teacher' } }
+    { tags: { name: 'verify_teacher' }, expectedStatuses: [200] }
   );
   const verifyData = safeJson(verifyRes);
   const teacherToken = verifyData.token;
@@ -120,7 +124,7 @@ export function setup() {
       qrInterval: Math.max(QR_LIFETIME_SEC, 10),
       fingerprintRequired: true
     },
-    { headers: authHeaders, tags: { name: 'create_session' } }
+    { headers: authHeaders, tags: { name: 'create_session' }, expectedStatuses: [201] }
   );
   const sessionData = safeJson(sessionRes);
   const sessionId = sessionData.sessionId;
@@ -178,7 +182,7 @@ export default function (data) {
     return;
   }
 
-  const check2 = apiCheck(data.sessionId, qr2.data.token, fingerprint);
+  const check2 = apiCheck(data.sessionId, qr2.data.token, fingerprint, [200, 403]);
   if (check2.res.status === 403 && check2.data.error === 'already_marked') {
     duplicateBlockedRate.add(true);
     sleep(THINK_TIME_SEC);
@@ -192,7 +196,7 @@ export default function (data) {
     return;
   }
 
-  const attendance2 = apiAttendance(data.sessionId, check2.data.oneTimeToken, fingerprint, '-retry');
+  const attendance2 = apiAttendance(data.sessionId, check2.data.oneTimeToken, fingerprint, '-retry', [403]);
   const blockedAtAttendance = attendance2.res.status === 403 && attendance2.data.error === 'already_marked';
   duplicateBlockedRate.add(blockedAtAttendance);
   if (!blockedAtAttendance) {
@@ -212,7 +216,8 @@ export function teardown(data) {
     {},
     {
       headers: { Authorization: `Bearer ${data.teacherToken}` },
-      tags: { name: 'end_session' }
+      tags: { name: 'end_session' },
+      expectedStatuses: [200]
     }
   );
 }

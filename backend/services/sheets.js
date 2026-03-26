@@ -3,15 +3,42 @@ import { config } from '../config.js';
 
 let client = null;
 
+function parseGoogleCredentials(raw) {
+  const src = String(raw || '').trim();
+  if (!src) return null;
+  const unescapedQuotes = src.split('\\"').join('"');
+  const normalizedBackslashNewlines = unescapedQuotes.replace(/\\\r?\n/g, '\\n');
+
+  const attempts = [
+    src,
+    unescapedQuotes,
+    normalizedBackslashNewlines,
+    normalizedBackslashNewlines.replace(/\\\\n/g, '\\n')
+  ];
+
+  for (const candidate of attempts) {
+    try {
+      let parsed = JSON.parse(candidate);
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 export function getSheetsClient() {
   if (client) return client;
   const { credentials, spreadsheetId } = config.googleSheets;
   if (!credentials || !spreadsheetId) return null;
-  let creds;
-  try {
-    creds = JSON.parse(credentials);
-  } catch (e) {
-    console.error('Invalid GOOGLE_SHEETS_CREDENTIALS JSON', e);
+  const creds = parseGoogleCredentials(credentials);
+  if (!creds) {
+    console.error(
+      'Invalid GOOGLE_SHEETS_CREDENTIALS JSON: expected service-account JSON object string in .env'
+    );
     return null;
   }
   const jwt = new google.auth.JWT(
