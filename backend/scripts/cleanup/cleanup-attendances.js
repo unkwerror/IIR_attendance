@@ -4,23 +4,23 @@
  * Оставляет только записи, у которых предмет (subject/Предмет) входит в список allowedSubjects из конфига.
  *
  * Запуск (конфиг обязателен — файл или env):
- *   node scripts/cleanup-attendances.js --config path/to/cleanup-config.json [--dry-run | --execute]
+ *   node scripts/cleanup/cleanup-attendances.js --config scripts/cleanup/cleanup-config.json [--dry-run | --execute]
  *
  * Переменные окружения: .env в backend/ или в корне проекта.
  *   DATABASE_URL — обязательно (БД).
  *   GOOGLE_SHEETS_CREDENTIALS, GOOGLE_SHEETS_SPREADSHEET_ID — нужны только для очистки Google Таблицы.
  */
 
-import './load-env.js';
+import '../utils/load-env.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { pool } from '../services/db.js';
-import { getSheetsClient } from '../services/sheets.js';
-import { config } from '../config.js';
+import { pool } from '../../services/db.js';
+import { getSheetsClient } from '../../services/sheets.js';
+import { config } from '../../config.js';
 
 const USAGE = `Использование:
-  node scripts/cleanup-attendances.js --config <путь к JSON> [--dry-run | --execute]
+  node scripts/cleanup/cleanup-attendances.js --config <путь к JSON> [--dry-run | --execute]
   или задайте конфиг в переменной CLEANUP_CONFIG_JSON (JSON-строка).
 
   --config   путь к файлу конфига (если не задан CLEANUP_CONFIG_JSON)
