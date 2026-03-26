@@ -5,9 +5,10 @@
 import { apiBase } from './config.js';
 
 async function request(endpoint, options = {}) {
+  const { headers: optionHeaders = {}, ...restOptions } = options;
   const res = await fetch(apiBase + endpoint, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options
+    ...restOptions,
+    headers: { 'Content-Type': 'application/json', ...optionHeaders }
   });
   const data = await res.json().catch(() => ({}));
   return { response: res, data };

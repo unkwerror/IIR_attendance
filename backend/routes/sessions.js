@@ -37,8 +37,8 @@ router.post('/api/sessions', async (req, res) => {
     qrInterval,
     fingerprintRequired = true
   } = req.body || {};
-  if (!subject || !qrInterval) {
-    return res.status(400).json({ error: 'subject и qrInterval обязательны' });
+  if (!subject) {
+    return res.status(400).json({ error: 'subject обязателен' });
   }
   const subjectStr = String(subject).trim();
   if (subjectStr.length > config.subjectMaxLength) {
