@@ -369,9 +369,11 @@ function showFail(icon, title, desc) {
     <div class="st-tag fail">Отказано в доступе</div>`;
 }
 
-const FALLBACK_FP_KEY = 'attendance_fallback_fp';
-const FALLBACK_FP_REG = /^[a-f0-9]{32}$/;
-const FPJS_TIMEOUT_MS = 10000;
+const DEVICE_ID_KEY = 'attendance_device_id';
+const LEGACY_DEVICE_ID_KEY = 'attendance_fallback_fp';
+const DEVICE_ID_REG = /^[a-f0-9]{32}$/;
+const DEVICE_ID_COOKIE = 'attendance_device_id';
+const DEVICE_ID_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365 * 2;
 
 function randomHex(bytesCount = 16) {
   const bytes = new Uint8Array(bytesCount);
@@ -383,16 +385,95 @@ function randomHex(bytesCount = 16) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function getStableFallbackFingerprint() {
-  try {
-    const saved = localStorage.getItem(FALLBACK_FP_KEY);
-    if (saved && FALLBACK_FP_REG.test(saved)) return `fb_local_${saved}`;
-    const created = randomHex(16);
-    localStorage.setItem(FALLBACK_FP_KEY, created);
-    return `fb_local_${created}`;
-  } catch (_) {
-    return `fb_tmp_${randomHex(16)}`;
+function hash32(input, seed = 0) {
+  let h = (0x811c9dc5 ^ seed) >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
   }
+  return h >>> 0;
+}
+
+function getDeterministicBrowserHash() {
+  const src = [
+    navigator.userAgent || '',
+    navigator.platform || '',
+    navigator.language || '',
+    String(screen.width || ''),
+    String(screen.height || ''),
+    String(screen.colorDepth || ''),
+    String(new Date().getTimezoneOffset()),
+    String(navigator.hardwareConcurrency || ''),
+    String(navigator.deviceMemory || '')
+  ].join('|');
+  const parts = [
+    hash32(src, 0),
+    hash32(src, 1),
+    hash32(src, 2),
+    hash32(src, 3)
+  ];
+  return parts.map((n) => n.toString(16).padStart(8, '0')).join('');
+}
+
+function normalizeDeviceId(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return DEVICE_ID_REG.test(v) ? v : '';
+}
+
+function readCookie(name) {
+  const parts = String(document.cookie || '').split(';');
+  for (const p of parts) {
+    const [k, ...rest] = p.trim().split('=');
+    if (k === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
+
+function writeCookie(name, value, maxAgeSec) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax`;
+}
+
+function readStoredDeviceId() {
+  let id = '';
+  try {
+    id = normalizeDeviceId(localStorage.getItem(DEVICE_ID_KEY));
+    if (!id) id = normalizeDeviceId(localStorage.getItem(LEGACY_DEVICE_ID_KEY));
+  } catch (_) {}
+  if (!id) {
+    try {
+      id = normalizeDeviceId(readCookie(DEVICE_ID_COOKIE));
+    } catch (_) {}
+  }
+  return id;
+}
+
+function persistDeviceId(id) {
+  let localOk = false;
+  let cookieOk = false;
+  try {
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    localStorage.setItem(LEGACY_DEVICE_ID_KEY, id);
+    localOk = normalizeDeviceId(localStorage.getItem(DEVICE_ID_KEY)) === id;
+  } catch (_) {}
+  try {
+    writeCookie(DEVICE_ID_COOKIE, id, DEVICE_ID_COOKIE_MAX_AGE_SEC);
+    cookieOk = normalizeDeviceId(readCookie(DEVICE_ID_COOKIE)) === id;
+  } catch (_) {}
+  return localOk || cookieOk;
+}
+
+function getStableDeviceFingerprint() {
+  const saved = readStoredDeviceId();
+  if (saved) {
+    persistDeviceId(saved);
+    return `dev_${saved}`;
+  }
+  const created = randomHex(16);
+  const persisted = persistDeviceId(created);
+  if (persisted) return `dev_${created}`;
+  // If both storages are unavailable (private mode / strict policy),
+  // keep stable best-effort fallback based on browser characteristics.
+  return `dev_anon_${getDeterministicBrowserHash()}`;
 }
 
 async function runCheck() {
@@ -404,20 +485,7 @@ async function runCheck() {
     <div class="st-title spin">Проверяем устройство…</div>
     <div class="st-desc">Секунду — идёт проверка QR</div>`;
 
-  let fp = getStableFallbackFingerprint();
-  if (window.FingerprintJS && typeof window.FingerprintJS.load === 'function') {
-    try {
-      const fpResult = await Promise.race([
-        (async () => {
-          const agent = await window.FingerprintJS.load();
-          const result = await agent.get();
-          return result && result.visitorId ? `fpjs_${result.visitorId}` : null;
-        })(),
-        new Promise((res) => setTimeout(() => res(null), FPJS_TIMEOUT_MS))
-      ]);
-      if (fpResult) fp = fpResult;
-    } catch (_) {}
-  }
+  const fp = getStableDeviceFingerprint();
 
   try {
     const { response, data } = await api.checkAccess({
