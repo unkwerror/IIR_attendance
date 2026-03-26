@@ -13,6 +13,7 @@ let cfg = { sessionId: null, interval: 15 };
 let tLeft = 15;
 let ticker = null;
 let attTimer = null;
+let startSessionInFlight = false;
 
 function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -150,8 +151,10 @@ async function submitTeacherCode() {
 }
 
 async function startSession() {
+  if (startSessionInFlight) return;
   const subject = document.getElementById('inp-subject').value.trim() || 'Занятие';
   const interval = parseInt(document.getElementById('inp-interval').value, 10) || 15;
+  const startBtn = document.getElementById('btn-start-session');
   const teacherToken = auth.getTeacherToken();
   if (!teacherToken) {
     show('screen-teacher-code');
@@ -159,6 +162,12 @@ async function startSession() {
     if (e) e.textContent = 'Сессия истекла. Введите код преподавателя снова.';
     if (w) w.classList.add('visible');
     return;
+  }
+  startSessionInFlight = true;
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.dataset.prevText = startBtn.textContent || '';
+    startBtn.textContent = 'ЗАПУСК...';
   }
   try {
     const { response, data } = await api.createSession({
@@ -175,7 +184,10 @@ async function startSession() {
       if (w) w.classList.add('visible');
       return;
     }
-    if (!response.ok) throw new Error('create');
+    if (!response.ok) {
+      const reason = data.error || `http_${response.status}`;
+      throw new Error(reason);
+    }
     const s = data.session;
     cfg.sessionId = data.sessionId;
     cfg.interval = s.qrInterval || interval;
@@ -189,7 +201,19 @@ async function startSession() {
     startTimer();
     startAttendancePolling();
   } catch (e) {
-    alert('Ошибка при создании сессии. Проверьте подключение к серверу.');
+    const map = {
+      too_many_requests: 'Слишком много запросов. Подождите минуту и попробуйте снова.',
+      internal_error: 'Внутренняя ошибка сервера. Попробуйте через несколько секунд.',
+      http_0: 'Сервер недоступен. Проверьте подключение к интернету.'
+    };
+    const msg = map[e.message] || `Ошибка при создании сессии (${e.message}).`;
+    alert(msg);
+  } finally {
+    startSessionInFlight = false;
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.textContent = startBtn.dataset.prevText || 'ЗАПУСТИТЬ СЕССИЮ →';
+    }
   }
 }
 
