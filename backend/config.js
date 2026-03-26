@@ -20,6 +20,7 @@ export const config = {
   trustProxy: process.env.TRUST_PROXY !== 'false',
   corsAllowedOrigins: toList(process.env.CORS_ALLOWED_ORIGINS),
   teacherSecret: process.env.TEACHER_SECRET || '',
+  debugDeviceTrace: process.env.DEBUG_DEVICE_TRACE === 'true',
   tokenTtlMs: 24 * 60 * 60 * 1000,
   verifyRateWindowMs: 15 * 60 * 1000,
   verifyMaxAttempts: toInt(process.env.VERIFY_MAX_ATTEMPTS, 5),

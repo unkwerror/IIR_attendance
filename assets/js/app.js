@@ -371,19 +371,8 @@ function showFail(icon, title, desc) {
 
 const DEVICE_ID_KEY = 'attendance_device_id';
 const LEGACY_DEVICE_ID_KEY = 'attendance_fallback_fp';
-const DEVICE_ID_REG = /^[a-f0-9]{32}$/;
 const DEVICE_ID_COOKIE = 'attendance_device_id';
 const DEVICE_ID_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365 * 2;
-
-function randomHex(bytesCount = 16) {
-  const bytes = new Uint8Array(bytesCount);
-  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-    window.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 function hash32(input, seed = 0) {
   let h = (0x811c9dc5 ^ seed) >>> 0;
@@ -394,17 +383,63 @@ function hash32(input, seed = 0) {
   return h >>> 0;
 }
 
-function getDeterministicBrowserHash() {
+function getCanvasSignature() {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 280;
+    canvas.height = 60;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 'no-canvas';
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(0, 0, 280, 60);
+    ctx.fillStyle = '#069';
+    ctx.fillText('Startup Studio NSU', 8, 8);
+    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+    ctx.fillText(String(navigator.userAgent || '').slice(0, 48), 8, 28);
+    return canvas.toDataURL();
+  } catch (_) {
+    return 'canvas-error';
+  }
+}
+
+function getWebGLSignature() {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return 'no-webgl';
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    const vendor = debug ? gl.getParameter(debug.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+    const renderer = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return `${vendor}|${renderer}|${gl.getParameter(gl.VERSION)}|${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}`;
+  } catch (_) {
+    return 'webgl-error';
+  }
+}
+
+function getDeterministicDeviceId() {
+  const maxScreen = Math.max(screen.width || 0, screen.height || 0);
+  const minScreen = Math.min(screen.width || 0, screen.height || 0);
+  const dpr = Math.round((window.devicePixelRatio || 1) * 100);
+  const timeZone = (Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions().timeZone) || '';
+  const languages = Array.isArray(navigator.languages) ? navigator.languages.join(',') : (navigator.language || '');
   const src = [
     navigator.userAgent || '',
     navigator.platform || '',
-    navigator.language || '',
-    String(screen.width || ''),
-    String(screen.height || ''),
-    String(screen.colorDepth || ''),
+    navigator.vendor || '',
+    languages,
+    String(navigator.maxTouchPoints || 0),
+    String(navigator.hardwareConcurrency || 0),
+    String(navigator.deviceMemory || 0),
+    String(screen.colorDepth || 0),
+    String(maxScreen),
+    String(minScreen),
+    String(dpr),
     String(new Date().getTimezoneOffset()),
-    String(navigator.hardwareConcurrency || ''),
-    String(navigator.deviceMemory || '')
+    timeZone,
+    getCanvasSignature(),
+    getWebGLSignature()
   ].join('|');
   const parts = [
     hash32(src, 0),
@@ -415,9 +450,22 @@ function getDeterministicBrowserHash() {
   return parts.map((n) => n.toString(16).padStart(8, '0')).join('');
 }
 
-function normalizeDeviceId(value) {
-  const v = String(value || '').trim().toLowerCase();
-  return DEVICE_ID_REG.test(v) ? v : '';
+function getDeterministicBrowserHash() {
+  const src = [
+    navigator.platform || '',
+    navigator.language || '',
+    String(Math.max(screen.width || 0, screen.height || 0)),
+    String(Math.min(screen.width || 0, screen.height || 0)),
+    String(screen.colorDepth || ''),
+    String(new Date().getTimezoneOffset())
+  ].join('|');
+  const parts = [
+    hash32(src, 0),
+    hash32(src, 1),
+    hash32(src, 2),
+    hash32(src, 3)
+  ];
+  return parts.map((n) => n.toString(16).padStart(8, '0')).join('');
 }
 
 function readCookie(name) {
@@ -436,43 +484,35 @@ function writeCookie(name, value, maxAgeSec) {
 function readStoredDeviceId() {
   let id = '';
   try {
-    id = normalizeDeviceId(localStorage.getItem(DEVICE_ID_KEY));
-    if (!id) id = normalizeDeviceId(localStorage.getItem(LEGACY_DEVICE_ID_KEY));
+    id = String(localStorage.getItem(DEVICE_ID_KEY) || '').trim().toLowerCase();
+    if (!id) id = String(localStorage.getItem(LEGACY_DEVICE_ID_KEY) || '').trim().toLowerCase();
   } catch (_) {}
   if (!id) {
     try {
-      id = normalizeDeviceId(readCookie(DEVICE_ID_COOKIE));
+      id = String(readCookie(DEVICE_ID_COOKIE) || '').trim().toLowerCase();
     } catch (_) {}
   }
   return id;
 }
 
 function persistDeviceId(id) {
-  let localOk = false;
-  let cookieOk = false;
   try {
     localStorage.setItem(DEVICE_ID_KEY, id);
     localStorage.setItem(LEGACY_DEVICE_ID_KEY, id);
-    localOk = normalizeDeviceId(localStorage.getItem(DEVICE_ID_KEY)) === id;
   } catch (_) {}
   try {
     writeCookie(DEVICE_ID_COOKIE, id, DEVICE_ID_COOKIE_MAX_AGE_SEC);
-    cookieOk = normalizeDeviceId(readCookie(DEVICE_ID_COOKIE)) === id;
   } catch (_) {}
-  return localOk || cookieOk;
 }
 
 function getStableDeviceFingerprint() {
-  const saved = readStoredDeviceId();
-  if (saved) {
-    persistDeviceId(saved);
-    return `dev_${saved}`;
+  const deterministic = getDeterministicDeviceId();
+  if (deterministic) {
+    persistDeviceId(deterministic);
+    return `dev_${deterministic}`;
   }
-  const created = randomHex(16);
-  const persisted = persistDeviceId(created);
-  if (persisted) return `dev_${created}`;
-  // If both storages are unavailable (private mode / strict policy),
-  // keep stable best-effort fallback based on browser characteristics.
+  const saved = readStoredDeviceId();
+  if (saved) return `dev_${saved}`;
   return `dev_anon_${getDeterministicBrowserHash()}`;
 }
 

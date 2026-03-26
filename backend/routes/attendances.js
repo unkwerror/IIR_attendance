@@ -8,6 +8,15 @@ import { checkGenericLimit, recordGenericLimit } from '../services/rateLimit.js'
 const router = Router();
 const LIMIT_NAME = 'api-attendances';
 
+function normalizeText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function fpShort(fp) {
+  const s = String(fp || '');
+  return s.length <= 18 ? s : `${s.slice(0, 8)}...${s.slice(-6)}`;
+}
+
 router.post('/api/attendances', async (req, res) => {
   const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
@@ -19,8 +28,8 @@ router.post('/api/attendances', async (req, res) => {
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
     return res.status(400).json({ error: 'required fields missing' });
   }
-  const name = String(studentName).trim();
-  const group = String(studentGroup).trim();
+  const name = normalizeText(studentName);
+  const group = normalizeText(studentGroup);
   const normalizedName = name.toLowerCase();
   const normalizedGroup = group.toLowerCase();
   if (name.length < 1 || name.length > config.studentNameMaxLength) {
@@ -35,6 +44,9 @@ router.post('/api/attendances', async (req, res) => {
     String(fingerprint).length > config.fingerprintMaxLength
   ) {
     return res.status(400).json({ error: 'invalid parameters' });
+  }
+  if (config.debugDeviceTrace) {
+    console.log(`[trace/attendance] session=${sessionId} ip=${ip} fp=${fpShort(fingerprint)} token=${fpShort(oneTimeToken)}`);
   }
 
   try {
@@ -61,10 +73,16 @@ router.post('/api/attendances', async (req, res) => {
       );
       const tokenInfo = tokRows[0];
       if (!tokenInfo || tokenInfo.fingerprint !== fingerprint) {
+        if (config.debugDeviceTrace) {
+          console.log(`[trace/attendance] invalid_token session=${sessionId} fp=${fpShort(fingerprint)}`);
+        }
         await client.query('rollback');
         return res.status(400).json({ error: 'invalid oneTimeToken' });
       }
       if (new Date() > tokenInfo.expires_at) {
+        if (config.debugDeviceTrace) {
+          console.log(`[trace/attendance] expired_token session=${sessionId} fp=${fpShort(fingerprint)}`);
+        }
         await client.query('rollback');
         return res.status(400).json({ error: 'oneTimeToken expired' });
       }
@@ -73,6 +91,9 @@ router.post('/api/attendances', async (req, res) => {
         [sessionId, fingerprint]
       );
       if (existFp.length > 0) {
+        if (config.debugDeviceTrace) {
+          console.log(`[trace/attendance] already_marked_fp session=${sessionId} fp=${fpShort(fingerprint)}`);
+        }
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
@@ -82,6 +103,9 @@ router.post('/api/attendances', async (req, res) => {
         [sessionId, name, group]
       );
       if (existStudent.length > 0) {
+        if (config.debugDeviceTrace) {
+          console.log(`[trace/attendance] already_marked_student session=${sessionId} name=${name} group=${group}`);
+        }
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
@@ -115,6 +139,9 @@ router.post('/api/attendances', async (req, res) => {
           createdAt: a.created_at
         }
       });
+      if (config.debugDeviceTrace) {
+        console.log(`[trace/attendance] created session=${sessionId} fp=${fpShort(fingerprint)} id=${a.id}`);
+      }
     } catch (e) {
       await client.query('rollback');
       if (e.code === '23505') {

@@ -8,6 +8,11 @@ import { checkGenericLimit, recordGenericLimit } from '../services/rateLimit.js'
 const router = Router();
 const LIMIT_NAME = 'api-check';
 
+function fpShort(fp) {
+  const s = String(fp || '');
+  return s.length <= 18 ? s : `${s.slice(0, 8)}...${s.slice(-6)}`;
+}
+
 router.post('/api/check', async (req, res) => {
   const { sessionId, token, fingerprint, geoLat, geoLng } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
@@ -25,6 +30,9 @@ router.post('/api/check', async (req, res) => {
     String(fingerprint).length > config.fingerprintMaxLength
   ) {
     return res.status(400).json({ error: 'invalid parameters' });
+  }
+  if (config.debugDeviceTrace) {
+    console.log(`[trace/check] session=${sessionId} ip=${ip} fp=${fpShort(fingerprint)}`);
   }
 
   try {
@@ -60,7 +68,12 @@ router.post('/api/check', async (req, res) => {
         `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
         [sessionId, fingerprint]
       );
-      if (existRows.length > 0) return res.status(403).json({ error: 'already_marked' });
+      if (existRows.length > 0) {
+        if (config.debugDeviceTrace) {
+          console.log(`[trace/check] already_marked session=${sessionId} fp=${fpShort(fingerprint)}`);
+        }
+        return res.status(403).json({ error: 'already_marked' });
+      }
     }
 
     const oneTimeToken = genId(20);
@@ -149,6 +162,9 @@ router.post('/api/check', async (req, res) => {
       oneTimeToken: issuedToken,
       session: { id: session.id, subject: session.subject }
     });
+    if (config.debugDeviceTrace) {
+      console.log(`[trace/check] issued session=${sessionId} fp=${fpShort(fingerprint)} token=${fpShort(issuedToken)}`);
+    }
   } catch (e) {
     console.error('check error', e);
     res.status(500).json({ error: 'internal_error' });
