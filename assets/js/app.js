@@ -408,6 +408,32 @@ function showFail(icon, title, desc) {
     <div class="st-tag fail">Отказано в доступе</div>`;
 }
 
+const FALLBACK_FP_KEY = 'attendance_fallback_fp';
+const FALLBACK_FP_REG = /^[a-f0-9]{32}$/;
+const FPJS_TIMEOUT_MS = 10000;
+
+function randomHex(bytesCount = 16) {
+  const bytes = new Uint8Array(bytesCount);
+  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getStableFallbackFingerprint() {
+  try {
+    const saved = localStorage.getItem(FALLBACK_FP_KEY);
+    if (saved && FALLBACK_FP_REG.test(saved)) return `fb_local_${saved}`;
+    const created = randomHex(16);
+    localStorage.setItem(FALLBACK_FP_KEY, created);
+    return `fb_local_${created}`;
+  } catch (_) {
+    return `fb_tmp_${randomHex(16)}`;
+  }
+}
+
 async function runCheck() {
   if (!uToken || !uSession) return showFail('✕', 'Неверная ссылка', 'Параметры повреждены. Отсканируйте QR заново.');
   const st = document.getElementById('st-card');
@@ -417,14 +443,20 @@ async function runCheck() {
     <div class="st-title spin">Проверяем устройство…</div>
     <div class="st-desc">Секунду — идёт проверка QR</div>`;
 
-  let fp = 'fb_' + navigator.userAgent + screen.width + screen.height;
-  try {
-    const fpResult = await Promise.race([
-      (async () => { const r = await (await FingerprintJS.load()).get(); return r.visitorId; })(),
-      new Promise((res) => setTimeout(() => res(null), 3000))
-    ]);
-    if (fpResult) fp = fpResult;
-  } catch (e) {}
+  let fp = getStableFallbackFingerprint();
+  if (window.FingerprintJS && typeof window.FingerprintJS.load === 'function') {
+    try {
+      const fpResult = await Promise.race([
+        (async () => {
+          const agent = await window.FingerprintJS.load();
+          const result = await agent.get();
+          return result && result.visitorId ? `fpjs_${result.visitorId}` : null;
+        })(),
+        new Promise((res) => setTimeout(() => res(null), FPJS_TIMEOUT_MS))
+      ]);
+      if (fpResult) fp = fpResult;
+    } catch (_) {}
+  }
 
   let lat = null, lng = null;
   if (uGeo && navigator.geolocation) {
