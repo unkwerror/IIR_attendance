@@ -25,6 +25,8 @@ export const config = {
   verifyRateWindowMs: 15 * 60 * 1000,
   verifyMaxAttempts: toInt(process.env.VERIFY_MAX_ATTEMPTS, 5),
   maxDevicesPerQr: toInt(process.env.MAX_DEVICES_PER_QR, 250),
+  antiForwardStrict: process.env.ANTI_FORWARD_STRICT !== 'false',
+  qrMinRemainingMs: toInt(process.env.QR_MIN_REMAINING_MS, 3000),
   qrTokenLifetimeSec: { min: 5, max: 30 },
   oneTimeTokenTtlMs: toInt(process.env.ONE_TIME_TOKEN_TTL_MS, 10 * 60 * 1000),
   subjectMaxLength: 300,

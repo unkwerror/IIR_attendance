@@ -383,39 +383,14 @@ function hash32(input, seed = 0) {
   return h >>> 0;
 }
 
-function getCanvasSignature() {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 280;
-    canvas.height = 60;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return 'no-canvas';
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#f60';
-    ctx.fillRect(0, 0, 280, 60);
-    ctx.fillStyle = '#069';
-    ctx.fillText('Startup Studio NSU', 8, 8);
-    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-    ctx.fillText(String(navigator.userAgent || '').slice(0, 48), 8, 28);
-    return canvas.toDataURL();
-  } catch (_) {
-    return 'canvas-error';
-  }
-}
-
-function getWebGLSignature() {
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    if (!gl) return 'no-webgl';
-    const debug = gl.getExtension('WEBGL_debug_renderer_info');
-    const vendor = debug ? gl.getParameter(debug.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
-    const renderer = debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    return `${vendor}|${renderer}|${gl.getParameter(gl.VERSION)}|${gl.getParameter(gl.SHADING_LANGUAGE_VERSION)}`;
-  } catch (_) {
-    return 'webgl-error';
-  }
+function normalizePlatform() {
+  const p = String(navigator.platform || '').toLowerCase();
+  if (p.includes('iphone') || p.includes('ipad') || p.includes('ipod')) return 'ios';
+  if (p.includes('android')) return 'android';
+  if (p.includes('win')) return 'windows';
+  if (p.includes('mac')) return 'mac';
+  if (p.includes('linux')) return 'linux';
+  return 'other';
 }
 
 function getDeterministicDeviceId() {
@@ -425,9 +400,7 @@ function getDeterministicDeviceId() {
   const timeZone = (Intl.DateTimeFormat && Intl.DateTimeFormat().resolvedOptions().timeZone) || '';
   const languages = Array.isArray(navigator.languages) ? navigator.languages.join(',') : (navigator.language || '');
   const src = [
-    navigator.userAgent || '',
-    navigator.platform || '',
-    navigator.vendor || '',
+    normalizePlatform(),
     languages,
     String(navigator.maxTouchPoints || 0),
     String(navigator.hardwareConcurrency || 0),
@@ -437,9 +410,7 @@ function getDeterministicDeviceId() {
     String(minScreen),
     String(dpr),
     String(new Date().getTimezoneOffset()),
-    timeZone,
-    getCanvasSignature(),
-    getWebGLSignature()
+    timeZone
   ].join('|');
   const parts = [
     hash32(src, 0),
@@ -536,10 +507,12 @@ async function runCheck() {
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
       if (err === 'token expired') return showFail('⏱', 'QR устарел', 'Код истёк. Отсканируйте свежий QR с проектора.');
+      if (err === 'token_stale') return showFail('⏱', 'QR обновился', 'Этот QR уже неактуален. Отсканируйте новый код с экрана.');
       if (err === 'invalid token') return showFail('✕', 'Неверный код', 'Код недействителен. Отсканируйте QR ещё раз.');
       if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
       if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.');
       if (err === 'geolocation required') return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.');
+      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.');
       if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.');
       if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.');
       return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Попробуйте ещё раз.');

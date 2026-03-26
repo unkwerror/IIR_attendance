@@ -53,6 +53,14 @@ router.post('/api/check', async (req, res) => {
     const tokenInfo = tokRows[0];
     if (!tokenInfo) return res.status(400).json({ error: 'invalid token' });
     if (new Date() > tokenInfo.expires_at) return res.status(400).json({ error: 'token expired' });
+    const remainingMs = tokenInfo.expires_at.getTime() - Date.now();
+    const strictMinRemainingMs = Math.max(
+      config.qrMinRemainingMs,
+      Math.floor((Number(session.qr_interval) || 15) * 1000 * 0.5)
+    );
+    if (config.antiForwardStrict && remainingMs < strictMinRemainingMs) {
+      return res.status(400).json({ error: 'token_stale' });
+    }
 
     if (config.geoEnforced && session.geo_required && session.geo_lat != null && session.geo_lng != null) {
       if (typeof geoLat !== 'number' || typeof geoLng !== 'number') {
@@ -85,6 +93,7 @@ router.post('/api/check', async (req, res) => {
       await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9201, token]);
 
       try {
+        const allowedDevicesPerQr = config.antiForwardStrict ? 1 : config.maxDevicesPerQr;
         const { rows: existingRows } = await client.query(
           `select token from qr_tokens
            where session_id = $1
@@ -107,11 +116,14 @@ router.post('/api/check', async (req, res) => {
           [token]
         );
         const count = parseInt(countRows[0]?.c || 0, 10);
-        if (!existingRows[0]?.token && count >= config.maxDevicesPerQr) {
+        if (!existingRows[0]?.token && count >= allowedDevicesPerQr) {
           await client.query('rollback');
+          const errCode = config.antiForwardStrict ? 'qr_forward_blocked' : 'qr_code_overused';
           return res.status(403).json({
-            error: 'qr_code_overused',
-            message: 'Этим кодом уже отметилось слишком много устройств. Отсканируйте свежий QR с экрана.'
+            error: errCode,
+            message: config.antiForwardStrict
+              ? 'Этот QR уже использован другим устройством. Дождитесь обновления кода и сканируйте заново.'
+              : 'Этим кодом уже отметилось слишком много устройств. Отсканируйте свежий QR с экрана.'
           });
         }
 
