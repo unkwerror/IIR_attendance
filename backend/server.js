@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config.js';
+import { pool } from './services/db.js';
 import { startMaintenanceJobs } from './services/maintenance.js';
 
 import healthRoutes from './routes/health.js';
@@ -33,6 +34,16 @@ app.use(express.json({
   limit: '256kb'
 }));
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    if (req.path === '/health') return;
+    const ms = Date.now() - start;
+    console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${req.ip}`);
+  });
+  next();
+});
+
 app.use(healthRoutes);
 app.use(authRoutes);
 app.use(sessionsRoutes);
@@ -41,6 +52,24 @@ app.use(attendancesRoutes);
 
 startMaintenanceJobs();
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`NSU attendance backend listening on port ${config.port}`);
 });
+
+function gracefulShutdown(signal) {
+  console.log(`[shutdown] ${signal} received, closing server…`);
+  server.close(() => {
+    console.log('[shutdown] HTTP server closed');
+    pool.end().then(() => {
+      console.log('[shutdown] DB pool drained');
+      process.exit(0);
+    }).catch(() => process.exit(1));
+  });
+  setTimeout(() => {
+    console.error('[shutdown] forced exit after 10s');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

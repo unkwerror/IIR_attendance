@@ -126,7 +126,7 @@ router.post('/api/attendances', async (req, res) => {
         studentName: a.student_name,
         studentGroup: a.student_group,
         sessionSubject
-      }).catch(() => {});
+      }).catch((err) => console.error('[sheets] append failed:', err.message || err));
 
       res.status(201).json({
         ok: true,

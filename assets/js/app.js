@@ -506,6 +506,7 @@ async function runCheck() {
     });
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
+      if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.');
       if (err === 'token expired') return showFail('⏱', 'QR устарел', 'Код истёк. Отсканируйте свежий QR с проектора.');
       if (err === 'token_stale') return showFail('⏱', 'QR обновился', 'Этот QR уже неактуален. Отсканируйте новый код с экрана.');
       if (err === 'invalid token') return showFail('✕', 'Неверный код', 'Код недействителен. Отсканируйте QR ещё раз.');

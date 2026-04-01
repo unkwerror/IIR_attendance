@@ -13,7 +13,13 @@ function fpShort(fp) {
   return s.length <= 18 ? s : `${s.slice(0, 8)}...${s.slice(-6)}`;
 }
 
+const BOT_UA_PATTERNS = /Google-Read-Aloud|Googlebot|bingbot|AdsBot|Mediapartners|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Applebot/i;
+
 router.post('/api/check', async (req, res) => {
+  const ua = req.get('user-agent') || '';
+  if (BOT_UA_PATTERNS.test(ua)) {
+    return res.status(403).json({ error: 'bot_denied' });
+  }
   const { sessionId, token, fingerprint, geoLat, geoLng } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   const rateScope = `${sessionId || 'unknown'}:${fingerprint || 'unknown'}`;
@@ -37,7 +43,7 @@ router.post('/api/check', async (req, res) => {
 
   try {
     const { rows: sessRows } = await pool.query(
-      `select id, subject, geo_lat, geo_lng, geo_radius, fingerprint_required, geo_required, ended_at
+      `select id, subject, qr_interval, geo_lat, geo_lng, geo_radius, fingerprint_required, geo_required, ended_at
        from sessions where id = $1`,
       [sessionId]
     );

@@ -4,14 +4,23 @@
 
 import { apiBase } from './config.js';
 
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 async function request(endpoint, options = {}) {
-  const { headers: optionHeaders = {}, ...restOptions } = options;
-  const res = await fetch(apiBase + endpoint, {
-    ...restOptions,
-    headers: { 'Content-Type': 'application/json', ...optionHeaders }
-  });
-  const data = await res.json().catch(() => ({}));
-  return { response: res, data };
+  const { headers: optionHeaders = {}, timeout = DEFAULT_TIMEOUT_MS, ...restOptions } = options;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(apiBase + endpoint, {
+      ...restOptions,
+      headers: { 'Content-Type': 'application/json', ...optionHeaders },
+      signal: controller.signal
+    });
+    const data = await res.json().catch(() => ({}));
+    return { response: res, data };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function withTeacherAuth(token, options = {}) {
