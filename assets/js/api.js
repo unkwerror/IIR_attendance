@@ -5,8 +5,14 @@
 import { apiBase } from './config.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_RETRIES = 0;
+const RETRY_DELAY_MS = 1500;
 
-async function request(endpoint, options = {}) {
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function requestOnce(endpoint, options = {}) {
   const { headers: optionHeaders = {}, timeout = DEFAULT_TIMEOUT_MS, ...restOptions } = options;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -21,6 +27,27 @@ async function request(endpoint, options = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function request(endpoint, options = {}) {
+  const { retries = DEFAULT_RETRIES, ...rest } = options;
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await requestOnce(endpoint, rest);
+      if (result.response.status >= 500 && attempt < retries) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      return result;
+    } catch (e) {
+      lastError = e;
+      if (attempt < retries) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+      }
+    }
+  }
+  throw lastError;
 }
 
 function withTeacherAuth(token, options = {}) {
@@ -57,13 +84,21 @@ export async function getQrToken(sessionId, lifetimeSec, teacherToken) {
 }
 
 export async function checkAccess(body) {
-  return request('/api/check', { method: 'POST', body: JSON.stringify(body) });
+  return request('/api/check', { method: 'POST', body: JSON.stringify(body), retries: 2 });
 }
 
 export async function submitAttendance(body) {
-  return request('/api/attendances', { method: 'POST', body: JSON.stringify(body) });
+  return request('/api/attendances', { method: 'POST', body: JSON.stringify(body), retries: 2 });
 }
 
 export async function getAttendances(sessionId, teacherToken) {
   return request(`/api/sessions/${sessionId}/attendances`, withTeacherAuth(teacherToken));
+}
+
+export function getCsvUrl(sessionId, teacherToken) {
+  return `${apiBase}/api/sessions/${sessionId}/attendances/csv?teacherToken=${encodeURIComponent(teacherToken)}`;
+}
+
+export async function getSessionStats(sessionId, teacherToken) {
+  return request(`/api/sessions/${sessionId}/stats`, withTeacherAuth(teacherToken));
 }

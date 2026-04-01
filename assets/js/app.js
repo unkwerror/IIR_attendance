@@ -197,6 +197,10 @@ async function startSession() {
     if (geoChip) geoChip.textContent = 'Fingerprint';
     show('screen-teacher');
     document.getElementById('att-box').style.display = 'block';
+    const csvBtn = document.getElementById('btn-csv');
+    const statsBtn = document.getElementById('btn-show-stats');
+    if (csvBtn) csvBtn.style.display = '';
+    if (statsBtn) statsBtn.style.display = '';
     genQR();
     startTimer();
     startAttendancePolling();
@@ -648,10 +652,73 @@ function startAttendancePolling() {
   attTimer = setInterval(load, 5000);
 }
 
+function downloadCsv() {
+  if (!cfg.sessionId) return;
+  const teacherToken = auth.getTeacherToken();
+  if (!teacherToken) return;
+  const url = api.getCsvUrl(cfg.sessionId, teacherToken);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function showSessionStats() {
+  if (!cfg.sessionId) return;
+  const teacherToken = auth.getTeacherToken();
+  if (!teacherToken) return;
+  const box = document.getElementById('session-stats-box');
+  const content = document.getElementById('stats-content');
+  const timelineEl = document.getElementById('stats-timeline');
+  if (!box || !content || !timelineEl) return;
+  content.textContent = 'Загрузка…';
+  timelineEl.innerHTML = '';
+  box.style.display = '';
+  try {
+    const { response, data } = await api.getSessionStats(cfg.sessionId, teacherToken);
+    if (!response.ok || data.total === undefined) {
+      content.textContent = 'Не удалось загрузить статистику.';
+      return;
+    }
+    if (data.total === 0) {
+      content.textContent = 'Пока никто не отметился.';
+      return;
+    }
+    const fmtTime = (iso) => {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">
+        <div>Всего отметок: <strong style="color:var(--pk);">${data.total}</strong></div>
+        <div>Среднее время: <strong>${data.avgDelaySec} сек</strong> от старта</div>
+        <div>Первая: <strong>${fmtTime(data.firstMarkAt)}</strong></div>
+        <div>Последняя: <strong>${fmtTime(data.lastMarkAt)}</strong></div>
+      </div>`;
+    const tl = data.timeline || [];
+    if (tl.length === 0) return;
+    const maxCount = Math.max(...tl.map((b) => b.count), 1);
+    timelineEl.innerHTML = tl.map((b) => {
+      const h = Math.max(2, Math.round((b.count / maxCount) * 56));
+      const label = b.count > 0 ? b.count : '';
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">
+        <span style="font-size:9px;color:var(--pk);font-weight:700;">${label}</span>
+        <div style="width:100%;height:${h}px;background:var(--pk);border-radius:3px 3px 0 0;opacity:${b.count > 0 ? 1 : 0.15};"></div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    content.textContent = 'Ошибка загрузки статистики.';
+  }
+}
+
 startAppParticlesOnce();
 initStars();
 initSplash();
 
+window.downloadCsv = downloadCsv;
+window.showSessionStats = showSessionStats;
 window.show = show;
 window.onTeacherCodeInput = onTeacherCodeInput;
 window.toggleTeacherCodeVis = toggleTeacherCodeVis;
