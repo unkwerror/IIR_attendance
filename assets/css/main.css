@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap&_v=2');
 :root{--bg:#111113;--sf:#1a1a1e;--bd:#2a2a32;--pk:#e8197d;--pd:rgba(232,25,125,.12);--pg:rgba(232,25,125,.3);--wh:#fff;--mt:#5c5c78;--dn:#ff3355;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--wh);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
@@ -91,7 +91,7 @@ input::placeholder{color:var(--mt);}
 .btn-new-session{padding:9px 20px;background:transparent;border:1.5px solid var(--bd);color:var(--mt);border-radius:8px;cursor:pointer;font-family:'Unbounded',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;transition:border-color .2s,color .2s,background .2s;}
 .btn-new-session:hover{border-color:var(--pk);color:var(--pk);background:var(--pd);}
 .foot-note{font-size:11px;color:var(--mt);}
-@media(max-width:780px){.tl{padding:0 16px;grid-template-rows:auto 1fr auto;height:auto;}.topbar{padding:14px 0;flex-wrap:wrap;border:none;gap:10px;}.t-main{grid-template-columns:1fr;padding:16px 0;gap:16px;}.qr-frame{width:calc(100vw - 60px)!important;height:calc(100vw - 60px)!important;}.info-row{grid-template-columns:1fr 1fr;}.t-foot{padding:12px 0;flex-direction:column;gap:6px;align-items:flex-start;}}
+@media(max-width:780px){.tl{padding:0 16px;grid-template-rows:auto 1fr auto;height:auto;}.topbar{padding:14px 0;flex-wrap:wrap;border:none;gap:10px;}.t-main{grid-template-columns:1fr;padding:16px 0;gap:16px;}.qr-frame{width:calc(100vw - 60px)!important;height:calc(100vw - 60px)!important;}.info-row{grid-template-columns:1fr 1fr;}.t-foot{padding:12px 0;flex-direction:column;gap:8px;align-items:stretch;}.t-foot>div{display:flex;flex-wrap:wrap;gap:6px;}.btn-new-session{flex:1;min-width:0;text-align:center;padding:10px 12px;font-size:9px;}#session-stats-box{padding:0 16px 12px!important;}}
 #screen-student{align-items:center;justify-content:center;padding:40px 20px;flex-direction:column;gap:0;}
 #screen-student .st-brand,#screen-student .st-card{position:relative;z-index:1;}
 .st-brand{display:flex;align-items:center;gap:9px;margin-bottom:28px;}

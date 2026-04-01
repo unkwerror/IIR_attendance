@@ -397,6 +397,37 @@ function normalizePlatform() {
   return 'other';
 }
 
+function getCanvasProbe() {
+  try {
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 16;
+    const ctx = c.getContext('2d');
+    if (!ctx) return '0';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('\u{1F600}Aa1', 2, 12);
+    const d = ctx.getImageData(0, 0, 64, 16).data;
+    let h = 0;
+    for (let i = 0; i < d.length; i += 37) h = (h * 31 + d[i]) >>> 0;
+    return h.toString(36);
+  } catch (_) {
+    return '0';
+  }
+}
+
+function getGLRenderer() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if (!gl) return '';
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    return dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '') : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function getDeterministicDeviceId() {
   const maxScreen = Math.max(screen.width || 0, screen.height || 0);
   const minScreen = Math.min(screen.width || 0, screen.height || 0);
@@ -408,13 +439,14 @@ function getDeterministicDeviceId() {
     languages,
     String(navigator.maxTouchPoints || 0),
     String(navigator.hardwareConcurrency || 0),
-    String(navigator.deviceMemory || 0),
     String(screen.colorDepth || 0),
     String(maxScreen),
     String(minScreen),
     String(dpr),
     String(new Date().getTimezoneOffset()),
-    timeZone
+    timeZone,
+    getCanvasProbe(),
+    getGLRenderer()
   ].join('|');
   const parts = [
     hash32(src, 0),
@@ -453,7 +485,9 @@ function readCookie(name) {
 }
 
 function writeCookie(name, value, maxAgeSec) {
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax`;
+  const base = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}`;
+  document.cookie = `${base}; SameSite=Lax`;
+  document.cookie = `${base}; SameSite=None; Secure`;
 }
 
 function readStoredDeviceId() {
@@ -561,8 +595,10 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
   const errEl = document.getElementById('att-form-err');
   if (nameInput) nameInput.addEventListener('input', () => { if (errEl) errEl.style.display = 'none'; });
   if (groupInput) groupInput.addEventListener('input', () => { if (errEl) errEl.style.display = 'none'; });
+  let submitting = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (submitting) return;
     const name = (nameInput && nameInput.value.trim()) || '';
     const group = (groupInput && groupInput.value.trim()) || '';
     const nameErr = validateCyrillicName(name);
@@ -576,6 +612,7 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
       return;
     }
     if (errEl) errEl.style.display = 'none';
+    submitting = true;
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
     btn.textContent = 'Отправка...';
@@ -592,7 +629,14 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
         if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
         if (err === 'oneTimeToken expired') return showFail('⏱', 'Сессия истекла', 'Слишком долгое заполнение. Отсканируйте QR заново.');
         if (response.status === 429 || err === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и попробуйте снова.');
-        return showFail('✕', 'Ошибка', 'Не удалось сохранить отметку. Попробуйте снова.');
+        btn.disabled = false;
+        btn.textContent = 'ОТПРАВИТЬ';
+        submitting = false;
+        if (errEl) {
+          errEl.textContent = 'Не удалось сохранить отметку. Попробуйте снова.';
+          errEl.style.display = '';
+        }
+        return;
       }
       const card = document.getElementById('st-card');
       if (card) {
@@ -604,7 +648,13 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
           <div class="st-tag ok">Подтверждено</div>`;
       }
     } catch (err) {
-      showFail('✕', 'Сервер недоступен', 'Не удалось отправить данные. Попробуйте ещё раз.');
+      btn.disabled = false;
+      btn.textContent = 'ОТПРАВИТЬ';
+      submitting = false;
+      if (errEl) {
+        errEl.textContent = 'Не удалось связаться с сервером. Попробуйте ещё раз.';
+        errEl.style.display = '';
+      }
     }
   });
 }
