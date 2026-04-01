@@ -197,10 +197,6 @@ async function startSession() {
     if (geoChip) geoChip.textContent = 'Fingerprint';
     show('screen-teacher');
     document.getElementById('att-box').style.display = 'block';
-    const csvBtn = document.getElementById('btn-csv');
-    const statsBtn = document.getElementById('btn-show-stats');
-    if (csvBtn) csvBtn.style.display = '';
-    if (statsBtn) statsBtn.style.display = '';
     genQR();
     startTimer();
     startAttendancePolling();
@@ -281,7 +277,95 @@ function renderQR(text) {
 
 function newSession() {
   if (ticker) clearInterval(ticker);
+  if (attTimer) clearInterval(attTimer);
+  cfg.sessionId = null;
   show('screen-setup');
+}
+
+async function endSession() {
+  if (!cfg.sessionId) return;
+  const teacherToken = auth.getTeacherToken();
+  if (!teacherToken) return;
+  if (ticker) clearInterval(ticker);
+  if (attTimer) clearInterval(attTimer);
+
+  try {
+    await api.endSessionApi(cfg.sessionId, teacherToken);
+  } catch (_) {}
+
+  const subjectEl = document.getElementById('post-subject');
+  const subjectText = document.getElementById('lbl-subject')?.textContent || '';
+  if (subjectEl) subjectEl.textContent = subjectText;
+
+  show('screen-post-session');
+  loadPostSessionData();
+}
+
+async function loadPostSessionData() {
+  if (!cfg.sessionId) return;
+  const teacherToken = auth.getTeacherToken();
+  if (!teacherToken) return;
+
+  try {
+    const { response, data } = await api.getAttendances(cfg.sessionId, teacherToken);
+    if (response.ok) {
+      const cnt = document.getElementById('post-att-count');
+      const list = document.getElementById('post-att-list');
+      if (cnt) cnt.textContent = data.count || 0;
+      if (list) {
+        const items = data.items || [];
+        if (items.length === 0) {
+          list.innerHTML = '<div style="font-size:12px;opacity:.6;">Никто не отметился.</div>';
+        } else {
+          list.innerHTML = items.map((it, i) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:11px;opacity:.6;">${i + 1}.</span>
+                <span>${esc(it.name)}</span>
+              </div>
+              <span style="font-size:11px;color:var(--mt);">${esc(it.group)}</span>
+            </div>`).join('');
+        }
+      }
+    }
+  } catch (_) {}
+
+  try {
+    const { response, data } = await api.getSessionStats(cfg.sessionId, teacherToken);
+    const content = document.getElementById('post-stats-content');
+    const timelineEl = document.getElementById('post-stats-timeline');
+    if (!content || !timelineEl) return;
+    if (!response.ok || data.total === undefined) {
+      content.textContent = 'Не удалось загрузить.';
+      return;
+    }
+    if (data.total === 0) {
+      content.textContent = 'Нет отметок.';
+      return;
+    }
+    const fmtTime = (iso) => {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">
+        <div>Всего: <strong style="color:var(--pk);">${data.total}</strong></div>
+        <div>Среднее: <strong>${data.avgDelaySec} сек</strong></div>
+        <div>Первая: <strong>${fmtTime(data.firstMarkAt)}</strong></div>
+        <div>Последняя: <strong>${fmtTime(data.lastMarkAt)}</strong></div>
+      </div>`;
+    const tl = data.timeline || [];
+    if (tl.length === 0) return;
+    const maxCount = Math.max(...tl.map((b) => b.count), 1);
+    timelineEl.innerHTML = tl.map((b) => {
+      const h = Math.max(2, Math.round((b.count / maxCount) * 56));
+      const label = b.count > 0 ? b.count : '';
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">
+        <span style="font-size:9px;color:var(--pk);font-weight:700;">${label}</span>
+        <div style="width:100%;height:${h}px;background:var(--pk);border-radius:3px 3px 0 0;opacity:${b.count > 0 ? 1 : 0.15};"></div>
+      </div>`;
+    }).join('');
+  } catch (_) {}
 }
 
 function startTimer() {
@@ -715,60 +799,12 @@ function downloadCsv() {
   a.remove();
 }
 
-async function showSessionStats() {
-  if (!cfg.sessionId) return;
-  const teacherToken = auth.getTeacherToken();
-  if (!teacherToken) return;
-  const box = document.getElementById('session-stats-box');
-  const content = document.getElementById('stats-content');
-  const timelineEl = document.getElementById('stats-timeline');
-  if (!box || !content || !timelineEl) return;
-  content.textContent = 'Загрузка…';
-  timelineEl.innerHTML = '';
-  box.style.display = '';
-  try {
-    const { response, data } = await api.getSessionStats(cfg.sessionId, teacherToken);
-    if (!response.ok || data.total === undefined) {
-      content.textContent = 'Не удалось загрузить статистику.';
-      return;
-    }
-    if (data.total === 0) {
-      content.textContent = 'Пока никто не отметился.';
-      return;
-    }
-    const fmtTime = (iso) => {
-      if (!iso) return '—';
-      return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    };
-    content.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">
-        <div>Всего отметок: <strong style="color:var(--pk);">${data.total}</strong></div>
-        <div>Среднее время: <strong>${data.avgDelaySec} сек</strong> от старта</div>
-        <div>Первая: <strong>${fmtTime(data.firstMarkAt)}</strong></div>
-        <div>Последняя: <strong>${fmtTime(data.lastMarkAt)}</strong></div>
-      </div>`;
-    const tl = data.timeline || [];
-    if (tl.length === 0) return;
-    const maxCount = Math.max(...tl.map((b) => b.count), 1);
-    timelineEl.innerHTML = tl.map((b) => {
-      const h = Math.max(2, Math.round((b.count / maxCount) * 56));
-      const label = b.count > 0 ? b.count : '';
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;">
-        <span style="font-size:9px;color:var(--pk);font-weight:700;">${label}</span>
-        <div style="width:100%;height:${h}px;background:var(--pk);border-radius:3px 3px 0 0;opacity:${b.count > 0 ? 1 : 0.15};"></div>
-      </div>`;
-    }).join('');
-  } catch (e) {
-    content.textContent = 'Ошибка загрузки статистики.';
-  }
-}
-
 startAppParticlesOnce();
 initStars();
 initSplash();
 
 window.downloadCsv = downloadCsv;
-window.showSessionStats = showSessionStats;
+window.endSession = endSession;
 window.show = show;
 window.onTeacherCodeInput = onTeacherCodeInput;
 window.toggleTeacherCodeVis = toggleTeacherCodeVis;

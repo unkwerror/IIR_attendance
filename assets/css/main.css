@@ -92,6 +92,19 @@ input::placeholder{color:var(--mt);}
 .btn-new-session:hover{border-color:var(--pk);color:var(--pk);background:var(--pd);}
 .foot-note{font-size:11px;color:var(--mt);}
 @media(max-width:780px){.tl{padding:0 16px;grid-template-rows:auto 1fr auto;height:auto;}.topbar{padding:14px 0;flex-wrap:wrap;border:none;gap:10px;}.t-main{grid-template-columns:1fr;padding:16px 0;gap:16px;}.qr-frame{width:calc(100vw - 60px)!important;height:calc(100vw - 60px)!important;}.info-row{grid-template-columns:1fr 1fr;}.t-foot{padding:12px 0;flex-direction:column;gap:8px;align-items:stretch;}.t-foot>div{display:flex;flex-wrap:wrap;gap:6px;}.btn-new-session{flex:1;min-width:0;text-align:center;padding:10px 12px;font-size:9px;}#session-stats-box{padding:0 16px 12px!important;}}
+#screen-post-session{align-items:center;justify-content:flex-start;padding:60px 20px 40px;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;}
+#screen-post-session::-webkit-scrollbar{display:none;}
+#screen-post-session .post-wrap{position:relative;z-index:1;width:100%;max-width:480px;display:flex;flex-direction:column;gap:24px;}
+.post-header{display:flex;flex-direction:column;gap:6px;}
+.post-title{font-family:'Unbounded',sans-serif;font-size:clamp(24px,5vw,34px);font-weight:900;line-height:1.1;letter-spacing:-.03em;}
+.post-subject{font-size:14px;color:var(--pk);font-weight:600;}
+.post-stats-card,.post-att-card{background:var(--sf);border:1.5px solid var(--bd);border-radius:16px;padding:18px 20px;}
+.post-stats-label{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mt);margin-bottom:10px;}
+.post-actions{display:flex;flex-direction:column;gap:10px;}
+.post-btn-secondary{background:transparent!important;border:1.5px solid var(--bd)!important;color:var(--mt)!important;}
+.post-btn-secondary:hover{border-color:var(--pk)!important;color:var(--pk)!important;background:var(--pd)!important;}
+.post-btn-secondary::after{display:none;}
+#post-att-list::-webkit-scrollbar{display:none;}
 #screen-student{align-items:center;justify-content:center;padding:40px 20px;flex-direction:column;gap:0;}
 #screen-student .st-brand,#screen-student .st-card{position:relative;z-index:1;}
 .st-brand{display:flex;align-items:center;gap:9px;margin-bottom:28px;}

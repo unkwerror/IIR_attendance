@@ -177,20 +177,42 @@
         </div>
       </div>
     </div>
-    <div id="session-stats-box" style="display:none;max-width:1100px;width:100%;margin:0 auto;padding:0 48px 16px;">
-      <div style="background:var(--sf);border:1.5px solid var(--bd);border-radius:16px;padding:18px 20px;">
-        <div style="font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--mt);margin-bottom:12px;">Статистика сессии</div>
-        <div id="stats-content" style="font-size:13px;color:var(--mt);line-height:1.7;"></div>
-        <div id="stats-timeline" style="margin-top:14px;display:flex;align-items:flex-end;gap:2px;height:60px;"></div>
-      </div>
-    </div>
     <div class="t-foot">
       <div class="foot-note">Страница обновляет код автоматически — не закрывайте вкладку</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn-new-session" id="btn-csv" onclick="downloadCsv()" style="display:none;">⬇ CSV</button>
-        <button class="btn-new-session" id="btn-show-stats" onclick="showSessionStats()" style="display:none;">📊 Статистика</button>
-        <button class="btn-new-session" onclick="newSession()">↺ Новая сессия</button>
+      <button class="btn-go" style="max-width:260px;font-size:11px;padding:12px 20px;" onclick="endSession()">ЗАВЕРШИТЬ СЕССИЮ</button>
+    </div>
+  </div>
+</div>
+
+<!-- POST-SESSION -->
+<div class="screen" id="screen-post-session">
+  <div class="post-wrap">
+    <div class="s-brand">
+      <div class="s-brand-dot"></div>
+      <div class="s-brand-txt">STARTUP<br>STUDIO <em>NSU</em></div>
+    </div>
+    <div class="post-header">
+      <div class="post-title">Сессия завершена</div>
+      <div class="post-subject" id="post-subject"></div>
+    </div>
+
+    <div class="post-stats-card" id="post-stats-card">
+      <div class="post-stats-label">Статистика</div>
+      <div id="post-stats-content" style="font-size:13px;color:var(--mt);line-height:1.7;">Загрузка…</div>
+      <div id="post-stats-timeline" style="margin-top:14px;display:flex;align-items:flex-end;gap:2px;height:60px;"></div>
+    </div>
+
+    <div class="post-att-card" id="post-att-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="post-stats-label">Список отметившихся</div>
+        <div style="font-family:'Unbounded',sans-serif;font-size:14px;font-weight:800;color:var(--pk);" id="post-att-count">0</div>
       </div>
+      <div id="post-att-list" style="border-top:1px solid var(--bd);padding-top:8px;font-size:13px;color:var(--mt);max-height:260px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;"></div>
+    </div>
+
+    <div class="post-actions">
+      <button class="btn-go" onclick="downloadCsv()">СКАЧАТЬ CSV</button>
+      <button class="btn-go post-btn-secondary" onclick="newSession()">НОВАЯ СЕССИЯ</button>
     </div>
   </div>
 </div>

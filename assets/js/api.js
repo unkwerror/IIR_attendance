@@ -95,6 +95,13 @@ export async function getAttendances(sessionId, teacherToken) {
   return request(`/api/sessions/${sessionId}/attendances`, withTeacherAuth(teacherToken));
 }
 
+export async function endSessionApi(sessionId, teacherToken) {
+  return request(`/api/sessions/${sessionId}/end`, withTeacherAuth(teacherToken, {
+    method: 'POST',
+    body: JSON.stringify({})
+  }));
+}
+
 export function getCsvUrl(sessionId, teacherToken) {
   return `${apiBase}/api/sessions/${sessionId}/attendances/csv?teacherToken=${encodeURIComponent(teacherToken)}`;
 }
