@@ -167,9 +167,11 @@ async function startSession() {
   if (startBtn) {
     startBtn.disabled = true;
     startBtn.dataset.prevText = startBtn.textContent || '';
-    startBtn.textContent = 'ЗАПУСК...';
+    startBtn.textContent = 'ПРОГРЕВ СЕРВЕРА...';
   }
   try {
+    try { await api.healthPing(); } catch (_) {}
+    if (startBtn) startBtn.textContent = 'ЗАПУСК...';
     const { response, data } = await api.createSession({
       teacherToken,
       subject,
@@ -245,7 +247,7 @@ async function genQR() {
 
 function renderQR(text) {
   if (typeof qrcode !== 'function') return;
-  const qr = qrcode(0, 'M');
+  const qr = qrcode(0, 'H');
   qr.addData(text);
   qr.make();
   const M = qr.getModuleCount();
@@ -585,22 +587,15 @@ function readStoredDeviceId() {
     id = String(localStorage.getItem(DEVICE_ID_KEY) || '').trim().toLowerCase();
     if (!id) id = String(localStorage.getItem(LEGACY_DEVICE_ID_KEY) || '').trim().toLowerCase();
   } catch (_) {}
-  if (!id) {
-    try {
-      id = String(readCookie(DEVICE_ID_COOKIE) || '').trim().toLowerCase();
-    } catch (_) {}
-  }
+  if (!id) { try { id = String(sessionStorage.getItem(DEVICE_ID_KEY) || '').trim().toLowerCase(); } catch (_) {} }
+  if (!id) { try { id = String(readCookie(DEVICE_ID_COOKIE) || '').trim().toLowerCase(); } catch (_) {} }
   return id;
 }
 
 function persistDeviceId(id) {
-  try {
-    localStorage.setItem(DEVICE_ID_KEY, id);
-    localStorage.setItem(LEGACY_DEVICE_ID_KEY, id);
-  } catch (_) {}
-  try {
-    writeCookie(DEVICE_ID_COOKIE, id, DEVICE_ID_COOKIE_MAX_AGE_SEC);
-  } catch (_) {}
+  try { localStorage.setItem(DEVICE_ID_KEY, id); localStorage.setItem(LEGACY_DEVICE_ID_KEY, id); } catch (_) {}
+  try { sessionStorage.setItem(DEVICE_ID_KEY, id); } catch (_) {}
+  try { writeCookie(DEVICE_ID_COOKIE, id, DEVICE_ID_COOKIE_MAX_AGE_SEC); } catch (_) {}
 }
 
 function generateRandomId() {
@@ -715,6 +710,7 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
       return;
     }
     if (errEl) errEl.style.display = 'none';
+    if (!confirm(`Подтвердите данные:\n\nФИО: ${name}\nГруппа: ${group}\n\nВсё верно?`)) return;
     submitting = true;
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;

@@ -83,6 +83,10 @@ export async function getQrToken(sessionId, lifetimeSec, teacherToken) {
   }));
 }
 
+export async function healthPing() {
+  return requestOnce('/health', { timeout: 8000 });
+}
+
 export async function checkAccess(body) {
   return request('/api/check', { method: 'POST', body: JSON.stringify(body), retries: 3 });
 }

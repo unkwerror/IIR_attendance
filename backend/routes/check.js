@@ -4,7 +4,7 @@ import { haversine } from '../util/haversine.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
 import { maybeInlineCleanup } from '../services/maintenance.js';
-import { fpShort, hashIp, hashUa } from '../util/format.js';
+import { fpShort } from '../util/format.js';
 
 const router = Router();
 
@@ -68,13 +68,9 @@ router.post('/api/check', async (req, res) => {
     }
 
     if (session.fingerprint_required) {
-      const ipH = hashIp(ip);
-      const uaH = hashUa(ua);
       const { rows: existRows } = await pool.query(
-        `select 1 from attendances
-         where session_id = $1 and (fingerprint = $2 or (ip_hash = $3 and ua_hash = $4))
-         limit 1`,
-        [sessionId, fingerprint, ipH, uaH]
+        `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
+        [sessionId, fingerprint]
       );
       if (existRows.length > 0) {
         console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));

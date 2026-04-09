@@ -64,43 +64,18 @@ router.post('/api/attendances', async (req, res) => {
       }
       const sessionSubject = tokenInfo.subject || '';
 
-      const { rows: existFp } = await client.query(
-        `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
-        [sessionId, fingerprint]
+      const { rows: insRows, rowCount } = await client.query(
+        `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash)
+         values ($1,$2,$3,$4,$5,$6,$7)
+         on conflict (session_id, fingerprint) do nothing
+         returning id, session_id, fingerprint, student_name, student_group, created_at`,
+        [id, sessionId, fingerprint, name, group, ipH, uaH]
       );
-      if (existFp.length > 0) {
+      if (rowCount === 0) {
         console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_fp', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
-
-      const { rows: existStudent } = await client.query(
-        `select 1 from attendances
-         where session_id = $1 and lower(student_name) = lower($2) and lower(student_group) = lower($3) limit 1`,
-        [sessionId, name, group]
-      );
-      if (existStudent.length > 0) {
-        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_student', sessionId, name, group, ip, ts: new Date().toISOString() }));
-        await client.query('rollback');
-        return res.status(403).json({ error: 'already_marked' });
-      }
-
-      const { rows: existServer } = await client.query(
-        `select 1 from attendances where session_id = $1 and ip_hash = $2 and ua_hash = $3 limit 1`,
-        [sessionId, ipH, uaH]
-      );
-      if (existServer.length > 0) {
-        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_server_fp', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
-        await client.query('rollback');
-        return res.status(403).json({ error: 'already_marked' });
-      }
-
-      const { rows: insRows } = await client.query(
-        `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash)
-         values ($1,$2,$3,$4,$5,$6,$7)
-         returning id, session_id, fingerprint, student_name, student_group, created_at`,
-        [id, sessionId, fingerprint, name, group, ipH, uaH]
-      );
 
       await client.query('delete from qr_tokens where token = $1', [oneTimeToken]);
       await client.query('commit');

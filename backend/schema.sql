@@ -43,9 +43,12 @@ create table if not exists attendances (
 -- Миграция: лимит устройств на один QR-код (защита от пересылки ссылки)
 alter table qr_tokens add column if not exists parent_qr_token text;
 
--- Миграция: серверный fingerprint (IP + UA хеши) для защиты от подмены client fingerprint
+-- Миграция: серверный fingerprint (IP + UA хеши) для аудита
 alter table attendances add column if not exists ip_hash text;
 alter table attendances add column if not exists ua_hash text;
+
+-- Миграция: убрать блокировку однофамильцев (два «Иванов Иван» в одной группе — легитимный кейс)
+drop index if exists uq_attendances_session_student_lower;
 
 create index if not exists idx_qr_tokens_expires_at on qr_tokens(expires_at);
 
@@ -56,8 +59,6 @@ create index if not exists idx_qr_tokens_session_one_time_expires on qr_tokens(s
 
 -- Защита от дублей при конкурентных вставках
 create unique index if not exists uq_attendances_session_fingerprint on attendances(session_id, fingerprint);
-create unique index if not exists uq_attendances_session_student_lower
-  on attendances(session_id, lower(student_name), lower(student_group));
 create unique index if not exists uq_qr_tokens_session_parent_fingerprint
   on qr_tokens(session_id, parent_qr_token, fingerprint)
   where is_one_time = true and parent_qr_token is not null;

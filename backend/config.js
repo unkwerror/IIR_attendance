@@ -41,7 +41,7 @@ export const config = {
     spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID
   },
   pool: {
-    max: toInt(process.env.POOL_MAX, isServerless ? 3 : 15),
+    max: toInt(process.env.POOL_MAX, isServerless ? 1 : 15),
     idleTimeoutMillis: toInt(process.env.POOL_IDLE_TIMEOUT_MS, isServerless ? 10000 : 30000)
   },
   maintenance: {

@@ -36,12 +36,12 @@ export async function runCleanup() {
 }
 
 let lastInlineCleanup = 0;
-const INLINE_COOLDOWN_MS = 30_000;
+const INLINE_COOLDOWN_MS = 120_000;
 
 export async function maybeInlineCleanup() {
   const now = Date.now();
   if (now - lastInlineCleanup < INLINE_COOLDOWN_MS) return;
-  if (Math.random() > 0.05) return;
+  if (Math.random() > 0.01) return;
   lastInlineCleanup = now;
   runCleanup().catch(() => {});
 }
