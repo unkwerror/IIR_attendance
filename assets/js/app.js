@@ -452,16 +452,17 @@ function showFail(icon, title, desc, opts = {}) {
   const card = document.getElementById('st-card');
   if (!card) return;
   const tagClass = opts.warn ? 'ok' : 'fail';
-  const tagText = opts.tagText || 'Отказано в доступе';
+  const tagText = esc(opts.tagText || 'Отказано в доступе');
   const ts = new Date().toISOString();
+  const code = esc(opts.errorCode || 'N/A');
   card.innerHTML = `
-    <div class="st-icon fail">${icon}</div>
-    <div class="st-title">${title}</div>
+    <div class="st-icon fail">${esc(icon)}</div>
+    <div class="st-title">${esc(title)}</div>
     <div class="st-sep"></div>
-    <div class="st-desc">${desc}</div>
+    <div class="st-desc">${esc(desc)}</div>
     <div class="st-tag ${tagClass}">${tagText}</div>
     <button onclick="location.reload()" style="margin-top:14px;padding:10px 24px;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;">Попробовать снова</button>
-    <details style="margin-top:10px;font-size:11px;opacity:.45;text-align:left;width:100%;"><summary style="cursor:pointer;">Подробности</summary><div style="margin-top:4px;word-break:break-all;">Время: ${ts}<br>Код: ${opts.errorCode || 'N/A'}</div></details>`;
+    <details style="margin-top:10px;font-size:11px;opacity:.45;text-align:left;width:100%;"><summary style="cursor:pointer;">Подробности</summary><div style="margin-top:4px;word-break:break-all;">Время: ${ts}<br>Код: ${code}</div></details>`;
 }
 
 const DEVICE_ID_KEY = 'attendance_device_id';
@@ -534,28 +535,9 @@ function getDeterministicDeviceId() {
     String(maxScreen),
     String(minScreen),
     String(dpr),
-    String(new Date().getTimezoneOffset()),
     timeZone,
     getCanvasProbe(),
     getGLRenderer()
-  ].join('|');
-  const parts = [
-    hash32(src, 0),
-    hash32(src, 1),
-    hash32(src, 2),
-    hash32(src, 3)
-  ];
-  return parts.map((n) => n.toString(16).padStart(8, '0')).join('');
-}
-
-function getDeterministicBrowserHash() {
-  const src = [
-    navigator.platform || '',
-    navigator.language || '',
-    String(Math.max(screen.width || 0, screen.height || 0)),
-    String(Math.min(screen.width || 0, screen.height || 0)),
-    String(screen.colorDepth || ''),
-    String(new Date().getTimezoneOffset())
   ].join('|');
   const parts = [
     hash32(src, 0),
@@ -806,17 +788,15 @@ function startAttendancePolling() {
   attTimer = setInterval(load, 5000);
 }
 
-function downloadCsv() {
+async function downloadCsv() {
   if (!cfg.sessionId) return;
   const teacherToken = auth.getTeacherToken();
   if (!teacherToken) return;
-  const url = api.getCsvUrl(cfg.sessionId, teacherToken);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = '';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  try {
+    await api.downloadCsvBlob(cfg.sessionId, teacherToken);
+  } catch (_) {
+    alert('Не удалось скачать CSV.');
+  }
 }
 
 startAppParticlesOnce();

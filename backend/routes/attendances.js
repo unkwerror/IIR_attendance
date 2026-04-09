@@ -65,6 +65,18 @@ router.post('/api/attendances', async (req, res) => {
       }
       const sessionSubject = tokenInfo.subject || '';
 
+      if (devId) {
+        const { rows: devDup } = await client.query(
+          `select 1 from attendances where session_id = $1 and device_id = $2 limit 1`,
+          [sessionId, devId]
+        );
+        if (devDup.length > 0) {
+          console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_device_id', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
+          await client.query('rollback');
+          return res.status(403).json({ error: 'already_marked' });
+        }
+      }
+
       const { rows: insRows, rowCount } = await client.query(
         `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash, device_id)
          values ($1,$2,$3,$4,$5,$6,$7,$8)

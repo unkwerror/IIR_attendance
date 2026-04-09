@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { config } from './config.js';
 import { pool } from './services/db.js';
-import { runCleanup, startMaintenanceJobs } from './services/maintenance.js';
+import { startMaintenanceJobs } from './services/maintenance.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -35,10 +35,25 @@ app.use(express.json({
   limit: '256kb'
 }));
 
+app.use((req, _res, next) => {
+  if (req.ip == null) {
+    const h = req.headers;
+    const resolved =
+      h['x-nf-client-connection-ip'] ||
+      h['client-ip'] ||
+      (h['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.socket?.remoteAddress;
+    if (resolved) {
+      Object.defineProperty(req, 'ip', { value: resolved, configurable: true });
+    }
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    if (req.path === '/health' || req.path === '/api/maintenance') return;
+    if (req.path === '/health') return;
     const ms = Date.now() - start;
     console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${req.ip}`);
   });
@@ -49,11 +64,11 @@ const rlOpts = {
   standardHeaders: true,
   legacyHeaders: false,
   validate: { ip: false },
-  keyGenerator: (req) =>
-    req.ip ||
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    'unknown'
+  keyGenerator: (req) => {
+    const ip = req.ip;
+    if (!ip) return 'unknown';
+    return ipKeyGenerator(ip);
+  }
 };
 app.use('/api/check', rateLimit({ ...rlOpts, windowMs: 60_000, max: 300, message: { error: 'too_many_requests' } }));
 app.use('/api/attendances', rateLimit({ ...rlOpts, windowMs: 60_000, max: 150, message: { error: 'too_many_requests' } }));
@@ -64,11 +79,6 @@ app.use(authRoutes);
 app.use(sessionsRoutes);
 app.use(checkRoutes);
 app.use(attendancesRoutes);
-
-app.get('/api/maintenance', async (req, res) => {
-  const cleaned = await runCleanup();
-  res.json({ ok: true, cleaned });
-});
 
 const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 

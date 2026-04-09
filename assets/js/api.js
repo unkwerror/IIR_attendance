@@ -106,8 +106,20 @@ export async function endSessionApi(sessionId, teacherToken) {
   }));
 }
 
-export function getCsvUrl(sessionId, teacherToken) {
-  return `${apiBase}/api/sessions/${sessionId}/attendances/csv?teacherToken=${encodeURIComponent(teacherToken)}`;
+export async function downloadCsvBlob(sessionId, teacherToken) {
+  const res = await fetch(`${apiBase}/api/sessions/${sessionId}/attendances/csv`, {
+    headers: { Authorization: `Bearer ${teacherToken}` }
+  });
+  if (!res.ok) throw new Error(`csv_${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `attendance_${sessionId}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function getSessionStats(sessionId, teacherToken) {

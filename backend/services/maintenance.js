@@ -41,7 +41,7 @@ const INLINE_COOLDOWN_MS = 120_000;
 export async function maybeInlineCleanup() {
   const now = Date.now();
   if (now - lastInlineCleanup < INLINE_COOLDOWN_MS) return;
-  if (Math.random() > 0.01) return;
+  if (Math.random() > 0.002) return;
   lastInlineCleanup = now;
   runCleanup().catch(() => {});
 }

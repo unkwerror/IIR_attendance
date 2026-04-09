@@ -68,55 +68,45 @@ router.post('/api/check', async (req, res) => {
       if (dist > radius) return res.status(403).json({ error: 'out_of_radius', distance: dist, radius });
     }
 
-    if (session.fingerprint_required) {
-      let existQuery, existParams;
-      if (devId) {
-        existQuery = `select 1 from attendances where session_id = $1 and (fingerprint = $2 or device_id = $3) limit 1`;
-        existParams = [sessionId, fingerprint, devId];
-      } else {
-        existQuery = `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`;
-        existParams = [sessionId, fingerprint];
-      }
-      const { rows: existRows } = await pool.query(existQuery, existParams);
-      if (existRows.length > 0) {
+    {
+      const { rows: preRows } = await pool.query(
+        `select
+           (select 1 from attendances where session_id = $1
+              and (fingerprint = $2 or device_id = $3) limit 1) as marked,
+           (select token from qr_tokens where session_id = $1
+              and parent_qr_token = $4 and fingerprint = $2
+              and is_one_time = true and expires_at > now()
+            order by expires_at desc limit 1) as ott`,
+        [sessionId, fingerprint, devId || '', token]
+      );
+
+      if (session.fingerprint_required && preRows[0]?.marked) {
         console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
         return res.status(403).json({ error: 'already_marked' });
       }
-    }
-
-    const { rows: existingTokenRows } = await pool.query(
-      `select token from qr_tokens
-       where session_id = $1 and parent_qr_token = $2 and fingerprint = $3
-         and is_one_time = true and expires_at > now()
-       order by expires_at desc limit 1`,
-      [sessionId, token, fingerprint]
-    );
-    if (existingTokenRows[0]?.token) {
-      return res.json({ ok: true, oneTimeToken: existingTokenRows[0].token, session: { id: session.id, subject: session.subject } });
-    }
-
-    const { rows: countRows } = await pool.query(
-      `select count(distinct fingerprint)::int as c from qr_tokens
-       where parent_qr_token = $1 and is_one_time = true and expires_at > now()`,
-      [token]
-    );
-    if ((countRows[0]?.c || 0) >= config.maxDevicesPerQr) {
-      console.log(JSON.stringify({ event: 'check_rejected', reason: 'qr_overused', sessionId, tokenPrefix: token.slice(0, 8), ip, ts: new Date().toISOString() }));
-      return res.status(403).json({
-        error: 'qr_code_overused',
-        message: 'Этим кодом уже отметилось слишком много устройств. Отсканируйте свежий QR с экрана.'
-      });
+      if (preRows[0]?.ott) {
+        return res.json({ ok: true, oneTimeToken: preRows[0].ott, session: { id: session.id, subject: session.subject } });
+      }
     }
 
     const oneTimeToken = genId(20);
     const expiresAt = new Date(Date.now() + config.oneTimeTokenTtlMs);
     let issuedToken = oneTimeToken;
     try {
-      await pool.query(
+      const { rowCount } = await pool.query(
         `insert into qr_tokens (token, session_id, expires_at, fingerprint, is_one_time, parent_qr_token)
-         values ($1,$2,$3,$4,true,$5)`,
-        [oneTimeToken, sessionId, expiresAt, fingerprint, token]
+         select $1,$2,$3,$4,true,$5
+         where (select count(distinct fingerprint)::int from qr_tokens
+                where parent_qr_token = $5 and is_one_time = true and expires_at > now()) < $6`,
+        [oneTimeToken, sessionId, expiresAt, fingerprint, token, config.maxDevicesPerQr]
       );
+      if (rowCount === 0) {
+        console.log(JSON.stringify({ event: 'check_rejected', reason: 'qr_overused', sessionId, tokenPrefix: token.slice(0, 8), ip, ts: new Date().toISOString() }));
+        return res.status(403).json({
+          error: 'qr_code_overused',
+          message: 'Этим кодом уже отметилось слишком много устройств. Отсканируйте свежий QR с экрана.'
+        });
+      }
     } catch (e) {
       if (e.code !== '23505') throw e;
       const { rows: conflictRows } = await pool.query(

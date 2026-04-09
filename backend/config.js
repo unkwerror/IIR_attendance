@@ -18,7 +18,6 @@ const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL || proces
 export const config = {
   port: toInt(process.env.PORT, 4000),
   databaseUrl: process.env.DATABASE_URL,
-  pgSsl: process.env.PGSSLMODE === 'disable',
   trustProxy: process.env.TRUST_PROXY !== 'false',
   corsAllowedOrigins: toList(process.env.CORS_ALLOWED_ORIGINS),
   teacherSecret: process.env.TEACHER_SECRET || '',
