@@ -42,6 +42,7 @@ async function request(endpoint, options = {}) {
       return result;
     } catch (e) {
       lastError = e;
+      if (e?.name === 'AbortError') throw e;
       if (attempt < retries) {
         await sleep(RETRY_DELAY_MS * (attempt + 1));
       }
@@ -88,7 +89,12 @@ export async function healthPing() {
 }
 
 export async function checkAccess(body) {
-  return request('/api/check', { method: 'POST', body: JSON.stringify(body), retries: 3 });
+  return request('/api/check', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    retries: 1,
+    timeout: 12_000
+  });
 }
 
 export async function submitAttendance(body) {

@@ -627,7 +627,7 @@ async function runCheck() {
       const err = data.error || 'unknown';
       if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.', { errorCode: err });
       if (err === 'token expired' || err === 'token_stale' || err === 'invalid token') {
-        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует. Посмотрите на экран преподавателя и отсканируйте новый QR-код камерой телефона.', { tagText: 'Отсканируйте новый QR', errorCode: err });
+        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует (срок истёк или уже заменён новым). Отсканируйте актуальный QR с экрана преподавателя.', { tagText: 'Отсканируйте новый QR', errorCode: err });
       }
       if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.', { errorCode: err });
       if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.', { errorCode: err });
@@ -640,6 +640,9 @@ async function runCheck() {
     }
     showStudentForm(data.session, data.oneTimeToken, fp, deviceId);
   } catch (e) {
+    if (e?.name === 'AbortError') {
+      return showFail('⏱', 'Долгое ожидание', 'Сервер не ответил вовремя. Проверьте сеть и отсканируйте QR с экрана преподавателя ещё раз.', { tagText: 'Повторить сканирование', errorCode: 'timeout' });
+    }
     showFail('✕', 'Сервер недоступен', 'Не удалось связаться с сервером. Попробуйте позже.');
   }
 }
