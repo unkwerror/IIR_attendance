@@ -7,9 +7,17 @@ import { apiBase } from './config.js';
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 0;
 const RETRY_DELAY_MS = 1500;
+const CHECK_TIMEOUT_MS = 10_000;
+const ATTENDANCE_TIMEOUT_MS = 12_000;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function makeRequestError(code) {
+  const err = new Error(code);
+  err.code = code;
+  return err;
 }
 
 async function requestOnce(endpoint, options = {}) {
@@ -24,6 +32,14 @@ async function requestOnce(endpoint, options = {}) {
     });
     const data = await res.json().catch(() => ({}));
     return { response: res, data };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw makeRequestError('request_timeout');
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw makeRequestError('offline');
+    }
+    throw makeRequestError('network_error');
   } finally {
     clearTimeout(timer);
   }
@@ -42,7 +58,6 @@ async function request(endpoint, options = {}) {
       return result;
     } catch (e) {
       lastError = e;
-      if (e?.name === 'AbortError') throw e;
       if (attempt < retries) {
         await sleep(RETRY_DELAY_MS * (attempt + 1));
       }
@@ -92,13 +107,18 @@ export async function checkAccess(body) {
   return request('/api/check', {
     method: 'POST',
     body: JSON.stringify(body),
-    retries: 1,
-    timeout: 12_000
+    timeout: CHECK_TIMEOUT_MS,
+    retries: 0
   });
 }
 
 export async function submitAttendance(body) {
-  return request('/api/attendances', { method: 'POST', body: JSON.stringify(body), retries: 3 });
+  return request('/api/attendances', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    timeout: ATTENDANCE_TIMEOUT_MS,
+    retries: 0
+  });
 }
 
 export async function getAttendances(sessionId, teacherToken) {

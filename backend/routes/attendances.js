@@ -11,6 +11,19 @@ function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+async function hasExistingAttendance(client, sessionId, fingerprint, deviceId) {
+  const lookupDeviceId = deviceId || '';
+  const { rows } = await client.query(
+    `select 1
+     from attendances
+     where session_id = $1
+       and (fingerprint = $2 or ($3 <> '' and device_id = $3))
+     limit 1`,
+    [sessionId, fingerprint, lookupDeviceId]
+  );
+  return rows.length > 0;
+}
+
 router.post('/api/attendances', async (req, res) => {
   const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup, deviceId } = req.body || {};
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
@@ -54,6 +67,11 @@ router.post('/api/attendances', async (req, res) => {
       );
       const tokenInfo = tokRows[0];
       if (!tokenInfo || tokenInfo.fingerprint !== fingerprint) {
+        if (await hasExistingAttendance(client, sessionId, fingerprint, devId)) {
+          console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'already_marked_after_retry', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
+          await client.query('rollback');
+          return res.status(403).json({ error: 'already_marked' });
+        }
         console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'invalid_token', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(400).json({ error: 'invalid oneTimeToken' });
@@ -66,11 +84,7 @@ router.post('/api/attendances', async (req, res) => {
       const sessionSubject = tokenInfo.subject || '';
 
       if (devId) {
-        const { rows: devDup } = await client.query(
-          `select 1 from attendances where session_id = $1 and device_id = $2 limit 1`,
-          [sessionId, devId]
-        );
-        if (devDup.length > 0) {
+        if (await hasExistingAttendance(client, sessionId, fingerprint, devId)) {
           console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_device_id', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
           await client.query('rollback');
           return res.status(403).json({ error: 'already_marked' });

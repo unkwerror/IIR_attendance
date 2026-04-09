@@ -453,16 +453,31 @@ function showFail(icon, title, desc, opts = {}) {
   if (!card) return;
   const tagClass = opts.warn ? 'ok' : 'fail';
   const tagText = esc(opts.tagText || 'Отказано в доступе');
+  const allowRetry = opts.allowRetry !== false;
+  const retryLabel = esc(opts.retryLabel || 'Попробовать снова');
   const ts = new Date().toISOString();
   const code = esc(opts.errorCode || 'N/A');
+  const retryHtml = allowRetry
+    ? `<button onclick="location.reload()" style="margin-top:14px;padding:10px 24px;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;">${retryLabel}</button>`
+    : '';
   card.innerHTML = `
     <div class="st-icon fail">${esc(icon)}</div>
     <div class="st-title">${esc(title)}</div>
     <div class="st-sep"></div>
     <div class="st-desc">${esc(desc)}</div>
     <div class="st-tag ${tagClass}">${tagText}</div>
-    <button onclick="location.reload()" style="margin-top:14px;padding:10px 24px;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;">Попробовать снова</button>
+    ${retryHtml}
     <details style="margin-top:10px;font-size:11px;opacity:.45;text-align:left;width:100%;"><summary style="cursor:pointer;">Подробности</summary><div style="margin-top:4px;word-break:break-all;">Время: ${ts}<br>Код: ${code}</div></details>`;
+}
+
+function getCommIssueText(code) {
+  if (code === 'offline') {
+    return 'Похоже, что нет подключения к интернету. Подключитесь к сети и попробуйте снова.';
+  }
+  if (code === 'request_timeout') {
+    return 'Сервер слишком долго не отвечает. Попробуйте открыть ссылку ещё раз или отсканируйте новый QR-код.';
+  }
+  return 'Не удалось связаться с сервером. Попробуйте ещё раз позже.';
 }
 
 const DEVICE_ID_KEY = 'attendance_device_id';
@@ -605,7 +620,13 @@ function getStableDeviceFingerprint() {
 }
 
 async function runCheck() {
-  if (!uToken || !uSession) return showFail('✕', 'Неверная ссылка', 'Параметры повреждены. Отсканируйте QR заново.');
+  if (!uToken || !uSession) {
+    return showFail('✕', 'Неверная ссылка', 'Параметры повреждены. Отсканируйте QR заново.', {
+      tagText: 'Отсканируйте новый QR',
+      errorCode: 'invalid_link',
+      allowRetry: false
+    });
+  }
   const st = document.getElementById('st-card');
   if (!st) return;
   st.innerHTML = `
@@ -625,25 +646,83 @@ async function runCheck() {
     });
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
-      if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.', { errorCode: err });
-      if (err === 'token expired' || err === 'token_stale' || err === 'invalid token') {
-        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует (срок истёк или уже заменён новым). Отсканируйте актуальный QR с экрана преподавателя.', { tagText: 'Отсканируйте новый QR', errorCode: err });
+      if (err === 'bot_denied') {
+        return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.', {
+          errorCode: err,
+          allowRetry: false
+        });
       }
-      if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.', { errorCode: err });
-      if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.', { errorCode: err });
-      if (err === 'geolocation required') return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.', { errorCode: err });
-      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.', { tagText: 'Отсканируйте новый QR', errorCode: err });
-      if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.', { tagText: 'Отсканируйте новый QR', errorCode: err });
-      if (err === 'session already ended') return showFail('✕', 'Сессия завершена', 'Преподаватель уже завершил эту сессию.', { errorCode: err });
-      if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.', { errorCode: 'rate_limited' });
-      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', { tagText: 'Попробуйте ещё раз', errorCode: err });
+      if (err === 'token expired' || err === 'token_stale' || err === 'invalid token') {
+        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует. Посмотрите на экран преподавателя и отсканируйте новый QR-код камерой телефона.', {
+          tagText: 'Отсканируйте новый QR',
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'already_marked') {
+        return showFail('⚠', 'Вы уже отмечены', 'Повторная отметка для этого занятия не нужна.', {
+          tagText: 'Отметка уже есть',
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'out_of_radius') {
+        return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.', {
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'geolocation required') {
+        return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.', {
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'qr_forward_blocked') {
+        return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.', {
+          tagText: 'Отсканируйте новый QR',
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'qr_code_overused') {
+        return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.', {
+          tagText: 'Отсканируйте новый QR',
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (err === 'session already ended') {
+        return showFail('✕', 'Сессия завершена', 'Преподаватель уже завершил эту сессию.', {
+          errorCode: err,
+          allowRetry: false
+        });
+      }
+      if (response.status === 429 || data.error === 'too_many_requests') {
+        return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.', {
+          errorCode: 'rate_limited',
+          allowRetry: false
+        });
+      }
+      if (response.status >= 500 || err === 'internal_error') {
+        return showFail('✕', 'Сервер не отвечает', 'Сейчас сервер не смог обработать проверку. Попробуйте ещё раз через несколько секунд.', {
+          tagText: 'Временная ошибка сервера',
+          errorCode: err
+        });
+      }
+      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', {
+        tagText: 'Отсканируйте новый QR',
+        errorCode: err,
+        allowRetry: false
+      });
     }
     showStudentForm(data.session, data.oneTimeToken, fp, deviceId);
   } catch (e) {
-    if (e?.name === 'AbortError') {
-      return showFail('⏱', 'Долгое ожидание', 'Сервер не ответил вовремя. Проверьте сеть и отсканируйте QR с экрана преподавателя ещё раз.', { tagText: 'Повторить сканирование', errorCode: 'timeout' });
-    }
-    showFail('✕', 'Сервер недоступен', 'Не удалось связаться с сервером. Попробуйте позже.');
+    const code = e?.code || e?.message || 'network_error';
+    showFail('✕', 'Сервер не отвечает', getCommIssueText(code), {
+      tagText: 'Проблема со связью',
+      errorCode: code
+    });
   }
 }
 
@@ -713,16 +792,33 @@ function showStudentForm(session, oneTimeToken, fingerprint, deviceId) {
       });
       if (!response.ok || !data.ok) {
         const err = data.error || 'unknown';
-        if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
-        if (err === 'oneTimeToken expired' || err === 'invalid oneTimeToken') {
-          return showFail('⏱', 'Токен формы истёк', 'Отсканируйте QR-код заново с экрана преподавателя и заполните форму повторно.', { tagText: 'Отсканируйте новый QR' });
+        if (err === 'already_marked') {
+          return showFail('⚠', 'Вы уже отмечены', 'Повторная отметка для этого занятия не нужна.', {
+            tagText: 'Отметка уже есть',
+            errorCode: err,
+            allowRetry: false
+          });
         }
-        if (response.status === 429 || err === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и попробуйте снова.');
+        if (err === 'oneTimeToken expired' || err === 'invalid oneTimeToken') {
+          return showFail('⏱', 'Токен формы истёк', 'Отсканируйте QR-код заново с экрана преподавателя и заполните форму повторно.', {
+            tagText: 'Отсканируйте новый QR',
+            errorCode: err,
+            allowRetry: false
+          });
+        }
+        if (response.status === 429 || err === 'too_many_requests') {
+          return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и попробуйте снова.', {
+            errorCode: 'rate_limited',
+            allowRetry: false
+          });
+        }
         btn.disabled = false;
         btn.textContent = 'ОТПРАВИТЬ';
         submitting = false;
         if (errEl) {
-          errEl.textContent = 'Не удалось сохранить отметку. Попробуйте снова.';
+          errEl.textContent = response.status >= 500 || err === 'internal_error'
+            ? 'Сервер временно не отвечает. Попробуйте ещё раз через несколько секунд.'
+            : 'Не удалось сохранить отметку. Попробуйте снова.';
           errEl.style.display = '';
         }
         return;
@@ -741,7 +837,7 @@ function showStudentForm(session, oneTimeToken, fingerprint, deviceId) {
       btn.textContent = 'ОТПРАВИТЬ';
       submitting = false;
       if (errEl) {
-        errEl.textContent = 'Не удалось связаться с сервером. Попробуйте ещё раз.';
+        errEl.textContent = getCommIssueText(err?.code || err?.message || 'network_error');
         errEl.style.display = '';
       }
     }
