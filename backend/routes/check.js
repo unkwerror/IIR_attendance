@@ -34,10 +34,20 @@ router.post('/api/check', async (req, res) => {
     const { rows: joined } = await pool.query(
       `select s.id, s.subject, s.qr_interval, s.geo_lat, s.geo_lng, s.geo_radius,
               s.fingerprint_required, s.geo_required, s.ended_at,
-              q.token as qr_token, q.expires_at as qr_expires_at
+              q.token as qr_token, q.expires_at as qr_expires_at,
+              latest.latest_qr_token
        from sessions s
        left join qr_tokens q on q.session_id = s.id
          and q.token = $2 and q.is_one_time = false
+       left join lateral (
+         select qt.token as latest_qr_token, qt.expires_at
+         from qr_tokens qt
+         where qt.session_id = s.id
+           and qt.is_one_time = false
+           and qt.expires_at > now()
+         order by qt.expires_at desc
+         limit 1
+       ) latest on true
        where s.id = $1`,
       [sessionId, token]
     );
@@ -45,6 +55,10 @@ router.post('/api/check', async (req, res) => {
     if (!session) return res.status(404).json({ error: 'session not found' });
     if (session.ended_at) return res.status(400).json({ error: 'session already ended' });
     if (!session.qr_token) return res.status(400).json({ error: 'invalid token' });
+    if (session.latest_qr_token && session.latest_qr_token !== token) {
+      console.log(JSON.stringify({ event: 'check_rejected', reason: 'token_stale_rotated', sessionId, tokenPrefix: token.slice(0, 8), latestPrefix: session.latest_qr_token.slice(0, 8), ip, ts: new Date().toISOString() }));
+      return res.status(400).json({ error: 'token_stale' });
+    }
     if (new Date() > session.qr_expires_at) return res.status(400).json({ error: 'token expired' });
 
     const remainingMs = session.qr_expires_at.getTime() - Date.now();

@@ -14,6 +14,7 @@ let tLeft = 15;
 let ticker = null;
 let attTimer = null;
 let startSessionInFlight = false;
+let lastQrTokenErrorAlertAt = 0;
 
 function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -223,26 +224,46 @@ async function genQR() {
   if (!cfg.sessionId) return;
   const teacherToken = auth.getTeacherToken();
   if (!teacherToken) return;
-  try {
-    const { response, data } = await api.getQrToken(cfg.sessionId, cfg.interval, teacherToken);
-    if (response.status === 403 && data.error === 'teacher_required') {
-      auth.clearTeacherToken();
-      show('screen-teacher-code');
-      const e = document.getElementById('teacher-code-err-txt'), w = document.getElementById('teacher-code-err');
-      if (e) e.textContent = 'Сессия истекла. Введите код преподавателя снова.';
-      if (w) w.classList.add('visible');
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { response, data } = await api.getQrToken(cfg.sessionId, cfg.interval, teacherToken);
+      if (response.status === 403 && data.error === 'teacher_required') {
+        auth.clearTeacherToken();
+        show('screen-teacher-code');
+        const e = document.getElementById('teacher-code-err-txt'), w = document.getElementById('teacher-code-err');
+        if (e) e.textContent = 'Сессия истекла. Введите код преподавателя снова.';
+        if (w) w.classList.add('visible');
+        return;
+      }
+      if (!response.ok) throw new Error(`qr_${response.status}`);
+      const token = data.token;
+      const tok = document.getElementById('info-tok');
+      if (tok) tok.textContent = token.slice(0, 8) + '…';
+      const base = location.origin + location.pathname;
+      const url = `${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
+      renderQR(url);
       return;
+    } catch (e) {
+      lastError = e;
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 900));
+      }
     }
-    if (!response.ok) throw new Error('qr');
-    const token = data.token;
-    const tok = document.getElementById('info-tok');
-    if (tok) tok.textContent = token.slice(0, 8) + '…';
-    const base = location.origin + location.pathname;
-    const url = `${base}?sid=${encodeURIComponent(cfg.sessionId)}&t=${encodeURIComponent(token)}`;
-    renderQR(url);
-  } catch (e) {
-    alert('Не удалось получить QR‑токен с сервера.');
   }
+  const now = Date.now();
+  if (now - lastQrTokenErrorAlertAt < 15_000) return;
+  lastQrTokenErrorAlertAt = now;
+  const code = lastError?.code || lastError?.message || 'unknown';
+  if (code === 'offline') {
+    alert('Не удалось получить QR‑токен: нет подключения к интернету.');
+    return;
+  }
+  if (code === 'request_timeout') {
+    alert('Не удалось получить QR‑токен: сервер отвечает слишком долго.');
+    return;
+  }
+  alert('Не удалось получить QR‑токен с сервера.');
 }
 
 function renderQR(text) {
