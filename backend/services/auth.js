@@ -7,7 +7,6 @@ export function constantTimeCompare(a, b) {
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
   if (bufA.length !== bufB.length) {
-    Buffer.from(b, 'utf8');
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
@@ -30,14 +29,10 @@ export async function isTeacherTokenValid(token) {
 export async function createTeacherToken() {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + config.tokenTtlMs);
-  try {
-    await pool.query(
-      'insert into teacher_tokens (token, expires_at) values ($1, $2)',
-      [token, expiresAt]
-    );
-  } catch (e) {
-    console.error('[auth] token create error', e.message);
-  }
+  await pool.query(
+    'insert into teacher_tokens (token, expires_at) values ($1, $2)',
+    [token, expiresAt]
+  );
   return token;
 }
 

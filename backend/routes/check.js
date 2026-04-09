@@ -4,13 +4,9 @@ import { haversine } from '../util/haversine.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
 import { maybeInlineCleanup } from '../services/maintenance.js';
+import { fpShort } from '../util/format.js';
 
 const router = Router();
-
-function fpShort(fp) {
-  const s = String(fp || '');
-  return s.length <= 18 ? s : `${s.slice(0, 8)}...${s.slice(-6)}`;
-}
 
 const BOT_UA_PATTERNS = /Google-Read-Aloud|Googlebot|bingbot|AdsBot|Mediapartners|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|WhatsApp|Applebot/i;
 
@@ -37,24 +33,22 @@ router.post('/api/check', async (req, res) => {
   }
 
   try {
-    const { rows: sessRows } = await pool.query(
-      `select id, subject, qr_interval, geo_lat, geo_lng, geo_radius, fingerprint_required, geo_required, ended_at
-       from sessions where id = $1`,
-      [sessionId]
+    const { rows: joined } = await pool.query(
+      `select s.id, s.subject, s.qr_interval, s.geo_lat, s.geo_lng, s.geo_radius,
+              s.fingerprint_required, s.geo_required, s.ended_at,
+              q.token as qr_token, q.expires_at as qr_expires_at
+       from sessions s
+       left join qr_tokens q on q.session_id = s.id
+         and q.token = $2 and q.is_one_time = false
+       where s.id = $1`,
+      [sessionId, token]
     );
-    const session = sessRows[0];
+    const session = joined[0];
     if (!session) return res.status(404).json({ error: 'session not found' });
     if (session.ended_at) return res.status(400).json({ error: 'session already ended' });
-
-    const { rows: tokRows } = await pool.query(
-      `select token, expires_at from qr_tokens
-       where token = $1 and session_id = $2 and is_one_time = false`,
-      [token, sessionId]
-    );
-    const tokenInfo = tokRows[0];
-    if (!tokenInfo) return res.status(400).json({ error: 'invalid token' });
-    if (new Date() > tokenInfo.expires_at) return res.status(400).json({ error: 'token expired' });
-    const remainingMs = tokenInfo.expires_at.getTime() - Date.now();
+    if (!session.qr_token) return res.status(400).json({ error: 'invalid token' });
+    if (new Date() > session.qr_expires_at) return res.status(400).json({ error: 'token expired' });
+    const remainingMs = session.qr_expires_at.getTime() - Date.now();
     const strictMinRemainingMs = Math.max(
       config.qrMinRemainingMs,
       Math.floor((Number(session.qr_interval) || 15) * 1000 * 0.5)

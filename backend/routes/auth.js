@@ -11,8 +11,13 @@ router.post('/api/verify-teacher', async (req, res) => {
   if (!authService.validateTeacherCode(code)) {
     return res.status(401).json({ error: 'invalid_code' });
   }
-  const token = await authService.createTeacherToken();
-  res.json({ ok: true, token });
+  try {
+    const token = await authService.createTeacherToken();
+    res.json({ ok: true, token });
+  } catch (e) {
+    console.error('[auth] token create failed', e.message);
+    res.status(500).json({ error: 'internal_error' });
+  }
 });
 
 router.post('/api/check-teacher-token', async (req, res) => {

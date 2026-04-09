@@ -123,22 +123,22 @@ router.get('/api/sessions/:id/attendances', async (req, res) => {
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
-    const { rows: sessRows } = await pool.query('select id from sessions where id = $1', [id]);
-    if (sessRows.length === 0) return res.status(404).json({ error: 'session not found' });
     const { rows } = await pool.query(
-      `select id, student_name, student_group, created_at from attendances
-       where session_id = $1 order by created_at asc`,
+      `select a.id, a.student_name, a.student_group, a.created_at, s.id as sid
+       from sessions s
+       left join attendances a on a.session_id = s.id
+       where s.id = $1
+       order by a.created_at asc`,
       [id]
     );
-    res.json({
-      count: rows.length,
-      items: rows.map((a) => ({
-        id: a.id,
-        name: a.student_name,
-        group: a.student_group,
-        createdAt: a.created_at
-      }))
-    });
+    if (rows.length === 0) return res.status(404).json({ error: 'session not found' });
+    const items = rows[0].id ? rows.map((a) => ({
+      id: a.id,
+      name: a.student_name,
+      group: a.student_group,
+      createdAt: a.created_at
+    })) : [];
+    res.json({ count: items.length, items });
   } catch (e) {
     console.error('list attendances error', e);
     res.status(500).json({ error: 'internal_error' });
@@ -150,23 +150,24 @@ router.get('/api/sessions/:id/attendances/csv', async (req, res) => {
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
-    const { rows: sessRows } = await pool.query(
-      'select id, subject, started_at from sessions where id = $1', [id]
-    );
-    if (sessRows.length === 0) return res.status(404).json({ error: 'session not found' });
-    const session = sessRows[0];
     const { rows } = await pool.query(
-      `select student_name, student_group, created_at from attendances
-       where session_id = $1 order by created_at asc`,
+      `select s.subject, a.student_name, a.student_group, a.created_at, a.id as aid
+       from sessions s
+       left join attendances a on a.session_id = s.id
+       where s.id = $1
+       order by a.created_at asc`,
       [id]
     );
+    if (rows.length === 0) return res.status(404).json({ error: 'session not found' });
+    const session = { subject: rows[0].subject };
+    const attendances = rows[0].aid ? rows : [];
     const escapeCsv = (v) => {
       const s = String(v || '');
       return s.includes(',') || s.includes('"') || s.includes('\n')
         ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const header = '\uFEFF№,ФИО,Группа,Время отметки\n';
-    const lines = rows.map((a, i) => {
+    const lines = attendances.map((a, i) => {
       const t = new Date(a.created_at).toLocaleString('ru-RU', { timeZone: 'Asia/Novosibirsk' });
       return `${i + 1},${escapeCsv(a.student_name)},${escapeCsv(a.student_group)},${escapeCsv(t)}`;
     }).join('\n');
@@ -185,35 +186,47 @@ router.get('/api/sessions/:id/stats', async (req, res) => {
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
-    const { rows: sessRows } = await pool.query(
-      'select id, subject, started_at, ended_at from sessions where id = $1', [id]
-    );
-    if (sessRows.length === 0) return res.status(404).json({ error: 'session not found' });
-    const session = sessRows[0];
-    const { rows } = await pool.query(
-      `select created_at from attendances where session_id = $1 order by created_at asc`,
+    const { rows: aggRows } = await pool.query(
+      `select s.started_at,
+              count(a.id)::int as total,
+              min(a.created_at) as first_mark,
+              max(a.created_at) as last_mark,
+              round(avg(extract(epoch from a.created_at - s.started_at)))::int as avg_delay_sec
+       from sessions s
+       left join attendances a on a.session_id = s.id
+       where s.id = $1
+       group by s.id`,
       [id]
     );
-    const total = rows.length;
-    if (total === 0) {
+    if (aggRows.length === 0) return res.status(404).json({ error: 'session not found' });
+    const agg = aggRows[0];
+    if (agg.total === 0) {
       return res.json({ total: 0, firstMarkAt: null, lastMarkAt: null, avgDelaySec: 0, timeline: [] });
     }
-    const sessionStart = new Date(session.started_at).getTime();
-    const times = rows.map((r) => new Date(r.created_at).getTime());
-    const firstMarkAt = new Date(times[0]).toISOString();
-    const lastMarkAt = new Date(times[times.length - 1]).toISOString();
-    const delays = times.map((t) => (t - sessionStart) / 1000);
-    const avgDelaySec = Math.round(delays.reduce((a, b) => a + b, 0) / delays.length);
     const bucketSec = 15;
-    const maxBucket = Math.ceil((times[times.length - 1] - sessionStart) / 1000 / bucketSec);
-    const timeline = [];
-    for (let b = 0; b <= maxBucket; b++) {
-      const lo = b * bucketSec;
-      const hi = (b + 1) * bucketSec;
-      const count = delays.filter((d) => d >= lo && d < hi).length;
-      timeline.push({ offsetSec: lo, count });
-    }
-    res.json({ total, firstMarkAt, lastMarkAt, avgDelaySec, timeline });
+    const { rows: buckets } = await pool.query(
+      `select (width_bucket(
+                extract(epoch from a.created_at - s.started_at),
+                0,
+                extract(epoch from $2::timestamptz - s.started_at) + $3,
+                greatest(1, ceil((extract(epoch from $2::timestamptz - s.started_at) + $3) / $3)::int)
+              ) - 1) * $3 as offset_sec,
+              count(*)::int as cnt
+       from attendances a
+       join sessions s on s.id = a.session_id
+       where a.session_id = $1
+       group by offset_sec
+       order by offset_sec`,
+      [id, agg.last_mark, bucketSec]
+    );
+    const timeline = buckets.map((b) => ({ offsetSec: b.offset_sec ?? 0, count: b.cnt }));
+    res.json({
+      total: agg.total,
+      firstMarkAt: agg.first_mark ? new Date(agg.first_mark).toISOString() : null,
+      lastMarkAt: agg.last_mark ? new Date(agg.last_mark).toISOString() : null,
+      avgDelaySec: agg.avg_delay_sec || 0,
+      timeline
+    });
   } catch (e) {
     console.error('session stats error', e);
     res.status(500).json({ error: 'internal_error' });

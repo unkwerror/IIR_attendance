@@ -13,7 +13,7 @@ function toList(value) {
     .filter(Boolean);
 }
 
-const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL);
+const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 export const config = {
   port: toInt(process.env.PORT, 4000),

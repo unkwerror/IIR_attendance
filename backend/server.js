@@ -55,7 +55,7 @@ app.get('/api/maintenance', async (req, res) => {
   res.json({ ok: true, cleaned });
 });
 
-const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL);
+const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 if (!isServerless) {
   startMaintenanceJobs();

@@ -27,13 +27,11 @@ export async function runCleanup() {
   } catch (e) {
     console.error('[maintenance] qr cleanup error', e.message);
   }
-  try {
-    const teacherCleaned = await cleanupExpiredTokens();
-    cleaned += teacherCleaned;
-    if (teacherCleaned > 0) {
-      console.log(`[maintenance] cleaned expired teacher_tokens: ${teacherCleaned}`);
-    }
-  } catch (_) {}
+  const teacherCleaned = await cleanupExpiredTokens();
+  cleaned += teacherCleaned;
+  if (teacherCleaned > 0) {
+    console.log(`[maintenance] cleaned expired teacher_tokens: ${teacherCleaned}`);
+  }
   return cleaned;
 }
 

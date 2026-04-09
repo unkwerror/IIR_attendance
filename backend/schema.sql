@@ -41,6 +41,8 @@ create table if not exists attendances (
 -- Миграция: лимит устройств на один QR-код (защита от пересылки ссылки)
 alter table qr_tokens add column if not exists parent_qr_token text;
 
+create index if not exists idx_qr_tokens_expires_at on qr_tokens(expires_at);
+
 create index if not exists idx_attendances_session_id on attendances(session_id);
 create index if not exists idx_attendances_session_fp on attendances(session_id, fingerprint);
 create index if not exists idx_qr_tokens_parent_one_time on qr_tokens(parent_qr_token) where is_one_time = true;

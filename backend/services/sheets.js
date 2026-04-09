@@ -1,7 +1,15 @@
-import { google } from 'googleapis';
 import { config } from '../config.js';
 
+let google = null;
 let client = null;
+
+async function getGoogle() {
+  if (!google) {
+    const mod = await import('googleapis');
+    google = mod.google;
+  }
+  return google;
+}
 
 function parseGoogleCredentials(raw) {
   const src = String(raw || '').trim();
@@ -30,7 +38,7 @@ function parseGoogleCredentials(raw) {
   return null;
 }
 
-export function getSheetsClient() {
+export async function getSheetsClient() {
   if (client) return client;
   const { credentials, spreadsheetId } = config.googleSheets;
   if (!credentials || !spreadsheetId) return null;
@@ -41,21 +49,22 @@ export function getSheetsClient() {
     );
     return null;
   }
-  const jwt = new google.auth.JWT(
+  const g = await getGoogle();
+  const jwt = new g.auth.JWT(
     creds.client_email,
     null,
     creds.private_key,
     ['https://www.googleapis.com/auth/spreadsheets']
   );
   client = {
-    sheets: google.sheets({ version: 'v4', auth: jwt }),
+    sheets: g.sheets({ version: 'v4', auth: jwt }),
     spreadsheetId
   };
   return client;
 }
 
 export async function appendAttendanceRow({ createdAt, studentName, studentGroup, sessionSubject }) {
-  const c = getSheetsClient();
+  const c = await getSheetsClient();
   if (!c) return;
   const d = new Date(createdAt || Date.now());
   const ymd = d.toLocaleString('en-CA', {

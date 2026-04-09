@@ -13,7 +13,6 @@
 
 import '../utils/load-env.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { pool } from '../../services/db.js';
 import { getSheetsClient } from '../../services/sheets.js';
@@ -120,7 +119,7 @@ async function cleanupDatabase(allowedSubjects, dryRun) {
 }
 
 async function cleanupSheets(allowedSubjects, sheetName, dryRun) {
-  const c = getSheetsClient();
+  const c = await getSheetsClient();
   if (!c) {
     console.warn('\n--- Google Таблица ---');
     console.warn('GOOGLE_SHEETS_CREDENTIALS / GOOGLE_SHEETS_SPREADSHEET_ID не заданы или невалидны, пропуск.');

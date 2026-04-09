@@ -3,16 +3,12 @@ import { pool } from '../services/db.js';
 import { appendAttendanceRow } from '../services/sheets.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
+import { fpShort } from '../util/format.js';
 
 const router = Router();
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
-}
-
-function fpShort(fp) {
-  const s = String(fp || '');
-  return s.length <= 18 ? s : `${s.slice(0, 8)}...${s.slice(-6)}`;
 }
 
 router.post('/api/attendances', async (req, res) => {
@@ -38,21 +34,19 @@ router.post('/api/attendances', async (req, res) => {
     return res.status(400).json({ error: 'invalid parameters' });
   }
   if (config.debugDeviceTrace) {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
     console.log(`[trace/attendance] session=${sessionId} ip=${ip} fp=${fpShort(fingerprint)} token=${fpShort(oneTimeToken)}`);
   }
 
   try {
-    let sessionSubject = '';
-    try {
-      const { rows: sRows } = await pool.query('select subject from sessions where id = $1', [sessionId]);
-      if (sRows[0]) sessionSubject = sRows[0].subject || '';
-    } catch (_) {}
-
     const id = genId(18);
     const client = await pool.connect();
     try {
       await client.query('begin');
       await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9301, `${sessionId}:${fingerprint}`]);
+
+      const { rows: sRows } = await client.query('select subject from sessions where id = $1', [sessionId]);
+      const sessionSubject = sRows[0]?.subject || '';
       await client.query(
         'select pg_advisory_xact_lock($1, hashtext($2))',
         [9302, `${sessionId}:${normalizedName}:${normalizedGroup}`]
