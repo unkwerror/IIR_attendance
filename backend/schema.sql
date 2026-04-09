@@ -50,6 +50,10 @@ alter table attendances add column if not exists ua_hash text;
 -- Миграция: убрать блокировку однофамильцев (два «Иванов Иван» в одной группе — легитимный кейс)
 drop index if exists uq_attendances_session_student_lower;
 
+-- Миграция: детерминистический ID устройства (ловит повторные отметки из камерных WebView без localStorage)
+alter table attendances add column if not exists device_id text;
+create index if not exists idx_attendances_session_device_id on attendances(session_id, device_id);
+
 create index if not exists idx_qr_tokens_expires_at on qr_tokens(expires_at);
 
 create index if not exists idx_attendances_session_id on attendances(session_id);

@@ -45,7 +45,16 @@ app.use((req, res, next) => {
   next();
 });
 
-const rlOpts = { standardHeaders: true, legacyHeaders: false };
+const rlOpts = {
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { ip: false },
+  keyGenerator: (req) =>
+    req.ip ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    'unknown'
+};
 app.use('/api/check', rateLimit({ ...rlOpts, windowMs: 60_000, max: 300, message: { error: 'too_many_requests' } }));
 app.use('/api/attendances', rateLimit({ ...rlOpts, windowMs: 60_000, max: 150, message: { error: 'too_many_requests' } }));
 app.use('/api/verify-teacher', rateLimit({ ...rlOpts, windowMs: 15 * 60_000, max: 5, message: { error: 'too_many_attempts' } }));

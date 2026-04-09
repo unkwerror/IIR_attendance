@@ -15,8 +15,9 @@ router.post('/api/check', async (req, res) => {
   if (BOT_UA_PATTERNS.test(ua)) {
     return res.status(403).json({ error: 'bot_denied' });
   }
-  const { sessionId, token, fingerprint, geoLat, geoLng } = req.body || {};
+  const { sessionId, token, fingerprint, deviceId, geoLat, geoLng } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const devId = (typeof deviceId === 'string' && deviceId.length > 0 && deviceId.length <= 200) ? deviceId : null;
   maybeInlineCleanup();
   if (!sessionId || !token || !fingerprint) {
     return res.status(400).json({ error: 'sessionId, token и fingerprint обязательны' });
@@ -68,12 +69,17 @@ router.post('/api/check', async (req, res) => {
     }
 
     if (session.fingerprint_required) {
-      const { rows: existRows } = await pool.query(
-        `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
-        [sessionId, fingerprint]
-      );
+      let existQuery, existParams;
+      if (devId) {
+        existQuery = `select 1 from attendances where session_id = $1 and (fingerprint = $2 or device_id = $3) limit 1`;
+        existParams = [sessionId, fingerprint, devId];
+      } else {
+        existQuery = `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`;
+        existParams = [sessionId, fingerprint];
+      }
+      const { rows: existRows } = await pool.query(existQuery, existParams);
       if (existRows.length > 0) {
-        console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
+        console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
         return res.status(403).json({ error: 'already_marked' });
       }
     }

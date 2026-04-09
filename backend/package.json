@@ -1,6 +1,6 @@
 {
   "name": "nsu-attendance-backend",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "main": "server.js",

@@ -12,7 +12,7 @@ function normalizeText(value) {
 }
 
 router.post('/api/attendances', async (req, res) => {
-  const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup } = req.body || {};
+  const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup, deviceId } = req.body || {};
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
     return res.status(400).json({ error: 'required fields missing' });
   }
@@ -36,6 +36,7 @@ router.post('/api/attendances', async (req, res) => {
   const ua = req.get('user-agent') || '';
   const ipH = hashIp(ip);
   const uaH = hashUa(ua);
+  const devId = (typeof deviceId === 'string' && deviceId.length > 0 && deviceId.length <= 200) ? deviceId : null;
 
   try {
     const id = genId(18);
@@ -65,11 +66,11 @@ router.post('/api/attendances', async (req, res) => {
       const sessionSubject = tokenInfo.subject || '';
 
       const { rows: insRows, rowCount } = await client.query(
-        `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash)
-         values ($1,$2,$3,$4,$5,$6,$7)
+        `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash, device_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (session_id, fingerprint) do nothing
          returning id, session_id, fingerprint, student_name, student_group, created_at`,
-        [id, sessionId, fingerprint, name, group, ipH, uaH]
+        [id, sessionId, fingerprint, name, group, ipH, uaH, devId]
       );
       if (rowCount === 0) {
         console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_fp', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));

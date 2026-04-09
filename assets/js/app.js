@@ -632,12 +632,14 @@ async function runCheck() {
     <div class="st-desc">Секунду — идёт проверка QR</div>`;
 
   const fp = getStableDeviceFingerprint();
+  const deviceId = getDeterministicDeviceId();
 
   try {
     const { response, data } = await api.checkAccess({
       sessionId: uSession,
       token: uToken,
-      fingerprint: fp
+      fingerprint: fp,
+      deviceId
     });
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
@@ -654,13 +656,13 @@ async function runCheck() {
       if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.', { errorCode: 'rate_limited' });
       return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', { tagText: 'Попробуйте ещё раз', errorCode: err });
     }
-    showStudentForm(data.session, data.oneTimeToken, fp);
+    showStudentForm(data.session, data.oneTimeToken, fp, deviceId);
   } catch (e) {
     showFail('✕', 'Сервер недоступен', 'Не удалось связаться с сервером. Попробуйте позже.');
   }
 }
 
-function showStudentForm(session, oneTimeToken, fingerprint) {
+function showStudentForm(session, oneTimeToken, fingerprint, deviceId) {
   const sc = document.getElementById('screen-student');
   if (!sc) return;
   sc.innerHTML = `
@@ -721,7 +723,8 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
         oneTimeToken,
         fingerprint,
         studentName: name,
-        studentGroup: group
+        studentGroup: group,
+        deviceId
       });
       if (!response.ok || !data.ok) {
         const err = data.error || 'unknown';
