@@ -1,0 +1,12 @@
+[build]
+  command = "mkdir -p dist && npm install"
+  publish = "dist"
+
+[functions]
+  external_node_modules = ["express", "pg"]
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true

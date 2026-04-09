@@ -13,6 +13,8 @@ function toList(value) {
     .filter(Boolean);
 }
 
+const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL);
+
 export const config = {
   port: toInt(process.env.PORT, 4000),
   databaseUrl: process.env.DATABASE_URL,
@@ -22,12 +24,11 @@ export const config = {
   teacherSecret: process.env.TEACHER_SECRET || '',
   debugDeviceTrace: process.env.DEBUG_DEVICE_TRACE === 'true',
   tokenTtlMs: 24 * 60 * 60 * 1000,
-  verifyRateWindowMs: 15 * 60 * 1000,
-  verifyMaxAttempts: toInt(process.env.VERIFY_MAX_ATTEMPTS, 5),
   maxDevicesPerQr: toInt(process.env.MAX_DEVICES_PER_QR, 250),
   antiForwardStrict: process.env.ANTI_FORWARD_STRICT === 'true',
   qrMinRemainingMs: toInt(process.env.QR_MIN_REMAINING_MS, 3000),
-  qrTokenLifetimeSec: { min: 5, max: 30 },
+  qrTokenLifetimeSec: { min: 5, max: 60 },
+  qrTokenGraceSec: toInt(process.env.QR_TOKEN_GRACE_SEC, 15),
   oneTimeTokenTtlMs: toInt(process.env.ONE_TIME_TOKEN_TTL_MS, 10 * 60 * 1000),
   subjectMaxLength: 300,
   studentNameMaxLength: 200,
@@ -39,13 +40,9 @@ export const config = {
     credentials: process.env.GOOGLE_SHEETS_CREDENTIALS,
     spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID
   },
-  rateLimit: {
-    checkPerMinute: toInt(process.env.RATE_LIMIT_CHECK_PER_MINUTE, 800),
-    attendancesPerMinute: toInt(process.env.RATE_LIMIT_ATTENDANCES_PER_MINUTE, 500)
-  },
   pool: {
-    max: toInt(process.env.POOL_MAX, 15),
-    idleTimeoutMillis: toInt(process.env.POOL_IDLE_TIMEOUT_MS, 30000)
+    max: toInt(process.env.POOL_MAX, isServerless ? 3 : 15),
+    idleTimeoutMillis: toInt(process.env.POOL_IDLE_TIMEOUT_MS, isServerless ? 10000 : 30000)
   },
   maintenance: {
     enabled: process.env.MAINTENANCE_ENABLED !== 'false',

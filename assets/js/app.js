@@ -446,15 +446,17 @@ function showStudentFieldError(inputEl, message) {
   if (inputEl) inputEl.focus();
 }
 
-function showFail(icon, title, desc) {
+function showFail(icon, title, desc, opts = {}) {
   const card = document.getElementById('st-card');
   if (!card) return;
+  const tagClass = opts.warn ? 'ok' : 'fail';
+  const tagText = opts.tagText || 'Отказано в доступе';
   card.innerHTML = `
     <div class="st-icon fail">${icon}</div>
     <div class="st-title">${title}</div>
     <div class="st-sep"></div>
     <div class="st-desc">${desc}</div>
-    <div class="st-tag fail">Отказано в доступе</div>`;
+    <div class="st-tag ${tagClass}">${tagText}</div>`;
 }
 
 const DEVICE_ID_KEY = 'attendance_device_id';
@@ -629,16 +631,17 @@ async function runCheck() {
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
       if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.');
-      if (err === 'token expired') return showFail('⏱', 'QR устарел', 'Код истёк. Отсканируйте свежий QR с проектора.');
-      if (err === 'token_stale') return showFail('⏱', 'QR обновился', 'Этот QR уже неактуален. Отсканируйте новый код с экрана.');
-      if (err === 'invalid token') return showFail('✕', 'Неверный код', 'Код недействителен. Отсканируйте QR ещё раз.');
+      if (err === 'token expired' || err === 'token_stale' || err === 'invalid token') {
+        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует. Посмотрите на экран преподавателя и отсканируйте новый QR-код камерой телефона.', { tagText: 'Отсканируйте новый QR' });
+      }
       if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
       if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.');
       if (err === 'geolocation required') return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.');
-      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.');
-      if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.');
+      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.', { tagText: 'Отсканируйте новый QR' });
+      if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.', { tagText: 'Отсканируйте новый QR' });
+      if (err === 'session already ended') return showFail('✕', 'Сессия завершена', 'Преподаватель уже завершил эту сессию.');
       if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.');
-      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Попробуйте ещё раз.');
+      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', { tagText: 'Попробуйте ещё раз' });
     }
     showStudentForm(data.session, data.oneTimeToken, fp);
   } catch (e) {
@@ -711,7 +714,9 @@ function showStudentForm(session, oneTimeToken, fingerprint) {
       if (!response.ok || !data.ok) {
         const err = data.error || 'unknown';
         if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
-        if (err === 'oneTimeToken expired') return showFail('⏱', 'Сессия истекла', 'Слишком долгое заполнение. Отсканируйте QR заново.');
+        if (err === 'oneTimeToken expired' || err === 'invalid oneTimeToken') {
+          return showFail('⏱', 'Токен формы истёк', 'Отсканируйте QR-код заново с экрана преподавателя и заполните форму повторно.', { tagText: 'Отсканируйте новый QR' });
+        }
         if (response.status === 429 || err === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и попробуйте снова.');
         btn.disabled = false;
         btn.textContent = 'ОТПРАВИТЬ';

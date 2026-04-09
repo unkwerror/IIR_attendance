@@ -7,5 +7,6 @@ export const pool = new Pool({
   connectionString: config.databaseUrl,
   ssl: config.pgSsl ? false : { rejectUnauthorized: false },
   max: config.pool.max,
-  idleTimeoutMillis: config.pool.idleTimeoutMillis
+  idleTimeoutMillis: config.pool.idleTimeoutMillis,
+  options: '-c search_path=public'
 });

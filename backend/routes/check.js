@@ -3,10 +3,9 @@ import { pool } from '../services/db.js';
 import { haversine } from '../util/haversine.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
-import { checkGenericLimit, recordGenericLimit } from '../services/rateLimit.js';
+import { maybeInlineCleanup } from '../services/maintenance.js';
 
 const router = Router();
-const LIMIT_NAME = 'api-check';
 
 function fpShort(fp) {
   const s = String(fp || '');
@@ -22,11 +21,7 @@ router.post('/api/check', async (req, res) => {
   }
   const { sessionId, token, fingerprint, geoLat, geoLng } = req.body || {};
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  const rateScope = `${sessionId || 'unknown'}:${fingerprint || 'unknown'}`;
-  if (!checkGenericLimit(LIMIT_NAME, ip, config.rateLimit.checkPerMinute, rateScope)) {
-    return res.status(429).json({ error: 'too_many_requests' });
-  }
-  recordGenericLimit(LIMIT_NAME, ip, rateScope);
+  maybeInlineCleanup();
   if (!sessionId || !token || !fingerprint) {
     return res.status(400).json({ error: 'sessionId, token и fingerprint обязательны' });
   }
@@ -96,7 +91,7 @@ router.post('/api/check', async (req, res) => {
     let issuedToken = oneTimeToken;
     try {
       await client.query('begin');
-      await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9201, token]);
+      await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9201, `${sessionId}:${fingerprint}`]);
 
       try {
         const allowedDevicesPerQr = config.antiForwardStrict ? 1 : config.maxDevicesPerQr;

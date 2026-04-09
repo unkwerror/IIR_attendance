@@ -2,7 +2,7 @@
  * Конфигурация приложения и парсинг URL.
  */
 
-export const apiBase = 'https://iir-attendance.onrender.com';
+export const apiBase = 'https://iir-attendance.netlify.app';
 
 /**
  * Параметры из query/hash (iOS Safari QR может отдавать #?...

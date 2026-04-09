@@ -17,13 +17,14 @@ function getTeacherToken(req) {
   return '';
 }
 
-function requireTeacher(req, res) {
+async function requireTeacher(req, res) {
   if (!authService.isTeacherAuthConfigured()) {
     res.status(503).json({ error: 'teacher_auth_not_configured' });
     return false;
   }
   const teacherToken = getTeacherToken(req);
-  if (!authService.isTeacherTokenValid(teacherToken)) {
+  const valid = await authService.isTeacherTokenValid(teacherToken);
+  if (!valid) {
     res.status(403).json({ error: 'teacher_required' });
     return false;
   }
@@ -31,7 +32,7 @@ function requireTeacher(req, res) {
 }
 
 router.post('/api/sessions', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const subjectRaw = body.subject;
   const qrIntervalRaw = body.qrInterval;
@@ -87,7 +88,7 @@ router.post('/api/sessions', async (req, res) => {
 });
 
 router.post('/api/sessions/:id/qr-token', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -104,7 +105,8 @@ router.post('/api/sessions/:id/qr-token', async (req, res) => {
       config.qrTokenLifetimeSec.max,
       Math.max(config.qrTokenLifetimeSec.min, requestedSec)
     );
-    const expiresAt = new Date(Date.now() + lifetimeSec * 1000);
+    const totalTtlSec = lifetimeSec + (config.qrTokenGraceSec || 0);
+    const expiresAt = new Date(Date.now() + totalTtlSec * 1000);
     await pool.query(
       `insert into qr_tokens (token, session_id, expires_at, is_one_time) values ($1,$2,$3,false)`,
       [token, id, expiresAt]
@@ -117,7 +119,7 @@ router.post('/api/sessions/:id/qr-token', async (req, res) => {
 });
 
 router.get('/api/sessions/:id/attendances', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -144,7 +146,7 @@ router.get('/api/sessions/:id/attendances', async (req, res) => {
 });
 
 router.get('/api/sessions/:id/attendances/csv', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -179,7 +181,7 @@ router.get('/api/sessions/:id/attendances/csv', async (req, res) => {
 });
 
 router.get('/api/sessions/:id/stats', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {
@@ -219,7 +221,7 @@ router.get('/api/sessions/:id/stats', async (req, res) => {
 });
 
 router.post('/api/sessions/:id/end', async (req, res) => {
-  if (!requireTeacher(req, res)) return;
+  if (!(await requireTeacher(req, res))) return;
   const { id } = req.params;
   if (!isValidId(id)) return res.status(400).json({ error: 'invalid session id' });
   try {

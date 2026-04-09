@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config.js';
 import { pool } from './services/db.js';
-import { startMaintenanceJobs } from './services/maintenance.js';
+import { runCleanup, startMaintenanceJobs } from './services/maintenance.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -37,7 +37,7 @@ app.use(express.json({
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    if (req.path === '/health') return;
+    if (req.path === '/health' || req.path === '/api/maintenance') return;
     const ms = Date.now() - start;
     console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${req.ip}`);
   });
@@ -50,26 +50,37 @@ app.use(sessionsRoutes);
 app.use(checkRoutes);
 app.use(attendancesRoutes);
 
-startMaintenanceJobs();
-
-const server = app.listen(config.port, () => {
-  console.log(`NSU attendance backend listening on port ${config.port}`);
+app.get('/api/maintenance', async (req, res) => {
+  const cleaned = await runCleanup();
+  res.json({ ok: true, cleaned });
 });
 
-function gracefulShutdown(signal) {
-  console.log(`[shutdown] ${signal} received, closing server…`);
-  server.close(() => {
-    console.log('[shutdown] HTTP server closed');
-    pool.end().then(() => {
-      console.log('[shutdown] DB pool drained');
-      process.exit(0);
-    }).catch(() => process.exit(1));
+const isServerless = Boolean(process.env.NETLIFY || process.env.VERCEL);
+
+if (!isServerless) {
+  startMaintenanceJobs();
+
+  const server = app.listen(config.port, () => {
+    console.log(`NSU attendance backend listening on port ${config.port}`);
   });
-  setTimeout(() => {
-    console.error('[shutdown] forced exit after 10s');
-    process.exit(1);
-  }, 10_000).unref();
+
+  function gracefulShutdown(signal) {
+    console.log(`[shutdown] ${signal} received, closing server…`);
+    server.close(() => {
+      console.log('[shutdown] HTTP server closed');
+      pool.end().then(() => {
+        console.log('[shutdown] DB pool drained');
+        process.exit(0);
+      }).catch(() => process.exit(1));
+    });
+    setTimeout(() => {
+      console.error('[shutdown] forced exit after 10s');
+      process.exit(1);
+    }, 10_000).unref();
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+export default app;

@@ -1,4 +1,11 @@
--- NSU Attendance — базовая схема PostgreSQL (подходит для Supabase / Neon / Railway)
+-- NSU Attendance — базовая схема PostgreSQL (подходит для Neon / Supabase / Railway)
+
+create table if not exists teacher_tokens (
+  token text primary key,
+  expires_at timestamptz not null
+);
+
+create index if not exists idx_teacher_tokens_expires on teacher_tokens(expires_at);
 
 create table if not exists sessions (
   id text primary key,

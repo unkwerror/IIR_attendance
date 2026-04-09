@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { config } from '../config.js';
-
-const teacherTokens = new Map();
+import { pool } from './db.js';
 
 export function constantTimeCompare(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
@@ -14,24 +13,43 @@ export function constantTimeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function cleanupExpired() {
-  const now = Date.now();
-  for (const [token, data] of teacherTokens.entries()) {
-    if (data.expires < now) teacherTokens.delete(token);
+export async function isTeacherTokenValid(token) {
+  if (!token || typeof token !== 'string') return false;
+  try {
+    const { rows } = await pool.query(
+      'select 1 from teacher_tokens where token = $1 and expires_at > now() limit 1',
+      [token]
+    );
+    return rows.length > 0;
+  } catch (e) {
+    console.error('[auth] token check error', e.message);
+    return false;
   }
 }
 
-export function isTeacherTokenValid(token) {
-  if (!token || typeof token !== 'string') return false;
-  cleanupExpired();
-  const data = teacherTokens.get(token);
-  return data && data.expires > Date.now();
+export async function createTeacherToken() {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + config.tokenTtlMs);
+  try {
+    await pool.query(
+      'insert into teacher_tokens (token, expires_at) values ($1, $2)',
+      [token, expiresAt]
+    );
+  } catch (e) {
+    console.error('[auth] token create error', e.message);
+  }
+  return token;
 }
 
-export function createTeacherToken() {
-  const token = crypto.randomBytes(32).toString('hex');
-  teacherTokens.set(token, { expires: Date.now() + config.tokenTtlMs });
-  return token;
+export async function cleanupExpiredTokens() {
+  try {
+    const { rowCount } = await pool.query(
+      'delete from teacher_tokens where expires_at < now()'
+    );
+    return rowCount || 0;
+  } catch (_) {
+    return 0;
+  }
 }
 
 export function isTeacherAuthConfigured() {

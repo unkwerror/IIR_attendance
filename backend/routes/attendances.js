@@ -3,10 +3,8 @@ import { pool } from '../services/db.js';
 import { appendAttendanceRow } from '../services/sheets.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
-import { checkGenericLimit, recordGenericLimit } from '../services/rateLimit.js';
 
 const router = Router();
-const LIMIT_NAME = 'api-attendances';
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -19,12 +17,6 @@ function fpShort(fp) {
 
 router.post('/api/attendances', async (req, res) => {
   const { sessionId, oneTimeToken, fingerprint, studentName, studentGroup } = req.body || {};
-  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-  const rateScope = `${sessionId || 'unknown'}:${fingerprint || 'unknown'}`;
-  if (!checkGenericLimit(LIMIT_NAME, ip, config.rateLimit.attendancesPerMinute, rateScope)) {
-    return res.status(429).json({ error: 'too_many_requests' });
-  }
-  recordGenericLimit(LIMIT_NAME, ip, rateScope);
   if (!sessionId || !oneTimeToken || !fingerprint || !studentName || !studentGroup) {
     return res.status(400).json({ error: 'required fields missing' });
   }
