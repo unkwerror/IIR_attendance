@@ -84,11 +84,11 @@ export async function getQrToken(sessionId, lifetimeSec, teacherToken) {
 }
 
 export async function checkAccess(body) {
-  return request('/api/check', { method: 'POST', body: JSON.stringify(body), retries: 2 });
+  return request('/api/check', { method: 'POST', body: JSON.stringify(body), retries: 3 });
 }
 
 export async function submitAttendance(body) {
-  return request('/api/attendances', { method: 'POST', body: JSON.stringify(body), retries: 2 });
+  return request('/api/attendances', { method: 'POST', body: JSON.stringify(body), retries: 3 });
 }
 
 export async function getAttendances(sessionId, teacherToken) {

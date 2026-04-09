@@ -5,7 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["express", "pg", "googleapis", "dotenv"]
+  external_node_modules = ["express", "@neondatabase/serverless", "ws", "googleapis", "dotenv", "express-rate-limit"]
 
 [[redirects]]
   from = "/*"

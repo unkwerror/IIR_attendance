@@ -1,6 +1,6 @@
 {
   "name": "nsu-attendance-backend",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "main": "server.js",
@@ -9,12 +9,14 @@
     "start": "NODE_ENV=production node server.js"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.2",
     "googleapis": "^131.0.0",
     "helmet": "^8.0.0",
-    "pg": "^8.13.1",
-    "serverless-http": "^4.0.0"
+    "serverless-http": "^4.0.0",
+    "ws": "^8.20.0"
   }
 }

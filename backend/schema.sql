@@ -35,11 +35,17 @@ create table if not exists attendances (
   fingerprint text not null,
   student_name text not null,
   student_group text not null,
+  ip_hash text,
+  ua_hash text,
   created_at timestamptz not null default now()
 );
 
 -- Миграция: лимит устройств на один QR-код (защита от пересылки ссылки)
 alter table qr_tokens add column if not exists parent_qr_token text;
+
+-- Миграция: серверный fingerprint (IP + UA хеши) для защиты от подмены client fingerprint
+alter table attendances add column if not exists ip_hash text;
+alter table attendances add column if not exists ua_hash text;
 
 create index if not exists idx_qr_tokens_expires_at on qr_tokens(expires_at);
 

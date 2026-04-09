@@ -1,11 +1,15 @@
-import pkg from 'pg';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { config } from '../config.js';
 
-const { Pool } = pkg;
+neonConfig.webSocketConstructor = ws;
 
 export const pool = new Pool({
   connectionString: config.databaseUrl,
-  ssl: config.pgSsl ? false : { rejectUnauthorized: false },
   max: config.pool.max,
   idleTimeoutMillis: config.pool.idleTimeoutMillis
+});
+
+pool.on('error', (err) => {
+  console.error('[pg-pool] unexpected idle client error:', err.message);
 });

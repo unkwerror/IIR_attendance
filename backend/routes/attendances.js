@@ -3,7 +3,7 @@ import { pool } from '../services/db.js';
 import { appendAttendanceRow } from '../services/sheets.js';
 import { genId, isValidId } from '../util/id.js';
 import { config } from '../config.js';
-import { fpShort } from '../util/format.js';
+import { fpShort, hashIp, hashUa } from '../util/format.js';
 
 const router = Router();
 
@@ -18,8 +18,6 @@ router.post('/api/attendances', async (req, res) => {
   }
   const name = normalizeText(studentName);
   const group = normalizeText(studentGroup);
-  const normalizedName = name.toLowerCase();
-  const normalizedGroup = group.toLowerCase();
   if (name.length < 1 || name.length > config.studentNameMaxLength) {
     return res.status(400).json({ error: 'studentName: длина 1–200 символов' });
   }
@@ -33,74 +31,75 @@ router.post('/api/attendances', async (req, res) => {
   ) {
     return res.status(400).json({ error: 'invalid parameters' });
   }
-  if (config.debugDeviceTrace) {
-    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-    console.log(`[trace/attendance] session=${sessionId} ip=${ip} fp=${fpShort(fingerprint)} token=${fpShort(oneTimeToken)}`);
-  }
+
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const ua = req.get('user-agent') || '';
+  const ipH = hashIp(ip);
+  const uaH = hashUa(ua);
 
   try {
     const id = genId(18);
     const client = await pool.connect();
     try {
       await client.query('begin');
-      await client.query('select pg_advisory_xact_lock($1, hashtext($2))', [9301, `${sessionId}:${fingerprint}`]);
 
-      const { rows: sRows } = await client.query('select subject from sessions where id = $1', [sessionId]);
-      const sessionSubject = sRows[0]?.subject || '';
-      await client.query(
-        'select pg_advisory_xact_lock($1, hashtext($2))',
-        [9302, `${sessionId}:${normalizedName}:${normalizedGroup}`]
-      );
       const { rows: tokRows } = await client.query(
-        `select token, expires_at, fingerprint from qr_tokens
-         where token = $1 and session_id = $2 and is_one_time = true
-         for update`,
+        `select q.token, q.expires_at, q.fingerprint, s.subject
+         from qr_tokens q
+         join sessions s on s.id = q.session_id
+         where q.token = $1 and q.session_id = $2 and q.is_one_time = true
+         for update of q`,
         [oneTimeToken, sessionId]
       );
       const tokenInfo = tokRows[0];
       if (!tokenInfo || tokenInfo.fingerprint !== fingerprint) {
-        if (config.debugDeviceTrace) {
-          console.log(`[trace/attendance] invalid_token session=${sessionId} fp=${fpShort(fingerprint)}`);
-        }
+        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'invalid_token', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(400).json({ error: 'invalid oneTimeToken' });
       }
       if (new Date() > tokenInfo.expires_at) {
-        if (config.debugDeviceTrace) {
-          console.log(`[trace/attendance] expired_token session=${sessionId} fp=${fpShort(fingerprint)}`);
-        }
+        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'token_expired', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(400).json({ error: 'oneTimeToken expired' });
       }
+      const sessionSubject = tokenInfo.subject || '';
+
       const { rows: existFp } = await client.query(
         `select 1 from attendances where session_id = $1 and fingerprint = $2 limit 1`,
         [sessionId, fingerprint]
       );
       if (existFp.length > 0) {
-        if (config.debugDeviceTrace) {
-          console.log(`[trace/attendance] already_marked_fp session=${sessionId} fp=${fpShort(fingerprint)}`);
-        }
+        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_fp', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
+
       const { rows: existStudent } = await client.query(
         `select 1 from attendances
          where session_id = $1 and lower(student_name) = lower($2) and lower(student_group) = lower($3) limit 1`,
         [sessionId, name, group]
       );
       if (existStudent.length > 0) {
-        if (config.debugDeviceTrace) {
-          console.log(`[trace/attendance] already_marked_student session=${sessionId} name=${name} group=${group}`);
-        }
+        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_student', sessionId, name, group, ip, ts: new Date().toISOString() }));
+        await client.query('rollback');
+        return res.status(403).json({ error: 'already_marked' });
+      }
+
+      const { rows: existServer } = await client.query(
+        `select 1 from attendances where session_id = $1 and ip_hash = $2 and ua_hash = $3 limit 1`,
+        [sessionId, ipH, uaH]
+      );
+      if (existServer.length > 0) {
+        console.log(JSON.stringify({ event: 'attendance_rejected', reason: 'duplicate_server_fp', sessionId, fp: fpShort(fingerprint), ip, ts: new Date().toISOString() }));
         await client.query('rollback');
         return res.status(403).json({ error: 'already_marked' });
       }
 
       const { rows: insRows } = await client.query(
-        `insert into attendances (id, session_id, fingerprint, student_name, student_group)
-         values ($1,$2,$3,$4,$5)
+        `insert into attendances (id, session_id, fingerprint, student_name, student_group, ip_hash, ua_hash)
+         values ($1,$2,$3,$4,$5,$6,$7)
          returning id, session_id, fingerprint, student_name, student_group, created_at`,
-        [id, sessionId, fingerprint, name, group]
+        [id, sessionId, fingerprint, name, group, ipH, uaH]
       );
 
       await client.query('delete from qr_tokens where token = $1', [oneTimeToken]);
@@ -125,11 +124,8 @@ router.post('/api/attendances', async (req, res) => {
           createdAt: a.created_at
         }
       });
-      if (config.debugDeviceTrace) {
-        console.log(`[trace/attendance] created session=${sessionId} fp=${fpShort(fingerprint)} id=${a.id}`);
-      }
     } catch (e) {
-      await client.query('rollback');
+      try { await client.query('rollback'); } catch (_) {}
       if (e.code === '23505') {
         return res.status(403).json({ error: 'already_marked' });
       }

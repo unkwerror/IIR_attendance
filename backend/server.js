@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { pool } from './services/db.js';
 import { runCleanup, startMaintenanceJobs } from './services/maintenance.js';
@@ -43,6 +44,11 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+const rlOpts = { standardHeaders: true, legacyHeaders: false };
+app.use('/api/check', rateLimit({ ...rlOpts, windowMs: 60_000, max: 10, message: { error: 'too_many_requests' } }));
+app.use('/api/attendances', rateLimit({ ...rlOpts, windowMs: 60_000, max: 5, message: { error: 'too_many_requests' } }));
+app.use('/api/verify-teacher', rateLimit({ ...rlOpts, windowMs: 15 * 60_000, max: 5, message: { error: 'too_many_attempts' } }));
 
 app.use(healthRoutes);
 app.use(authRoutes);

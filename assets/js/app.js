@@ -451,12 +451,15 @@ function showFail(icon, title, desc, opts = {}) {
   if (!card) return;
   const tagClass = opts.warn ? 'ok' : 'fail';
   const tagText = opts.tagText || 'Отказано в доступе';
+  const ts = new Date().toISOString();
   card.innerHTML = `
     <div class="st-icon fail">${icon}</div>
     <div class="st-title">${title}</div>
     <div class="st-sep"></div>
     <div class="st-desc">${desc}</div>
-    <div class="st-tag ${tagClass}">${tagText}</div>`;
+    <div class="st-tag ${tagClass}">${tagText}</div>
+    <button onclick="location.reload()" style="margin-top:14px;padding:10px 24px;background:var(--sf);border:1.5px solid var(--bd);color:var(--wh);border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;">Попробовать снова</button>
+    <details style="margin-top:10px;font-size:11px;opacity:.45;text-align:left;width:100%;"><summary style="cursor:pointer;">Подробности</summary><div style="margin-top:4px;word-break:break-all;">Время: ${ts}<br>Код: ${opts.errorCode || 'N/A'}</div></details>`;
 }
 
 const DEVICE_ID_KEY = 'attendance_device_id';
@@ -600,15 +603,28 @@ function persistDeviceId(id) {
   } catch (_) {}
 }
 
+function generateRandomId() {
+  try { return crypto.randomUUID(); } catch (_) {}
+  try {
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (_) {}
+  return '';
+}
+
 function getStableDeviceFingerprint() {
-  const deterministic = getDeterministicDeviceId();
-  if (deterministic) {
-    persistDeviceId(deterministic);
-    return `dev_${deterministic}`;
-  }
   const saved = readStoredDeviceId();
   if (saved) return `dev_${saved}`;
-  return `dev_anon_${getDeterministicBrowserHash()}`;
+
+  const randomId = generateRandomId();
+  if (randomId) {
+    persistDeviceId(randomId);
+    const check = readStoredDeviceId();
+    if (check) return `dev_${check}`;
+  }
+
+  return `dev_det_${getDeterministicDeviceId()}`;
 }
 
 async function runCheck() {
@@ -630,18 +646,18 @@ async function runCheck() {
     });
     if (!response.ok || !data.ok) {
       const err = data.error || 'unknown';
-      if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.');
+      if (err === 'bot_denied') return showFail('✕', 'Бот заблокирован', 'Автоматические запросы запрещены. Откройте ссылку вручную в браузере.', { errorCode: err });
       if (err === 'token expired' || err === 'token_stale' || err === 'invalid token') {
-        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует. Посмотрите на экран преподавателя и отсканируйте новый QR-код камерой телефона.', { tagText: 'Отсканируйте новый QR' });
+        return showFail('⏱', 'QR-код устарел', 'Этот код больше не действует. Посмотрите на экран преподавателя и отсканируйте новый QR-код камерой телефона.', { tagText: 'Отсканируйте новый QR', errorCode: err });
       }
-      if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.');
-      if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.');
-      if (err === 'geolocation required') return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.');
-      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.', { tagText: 'Отсканируйте новый QR' });
-      if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.', { tagText: 'Отсканируйте новый QR' });
-      if (err === 'session already ended') return showFail('✕', 'Сессия завершена', 'Преподаватель уже завершил эту сессию.');
-      if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.');
-      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', { tagText: 'Попробуйте ещё раз' });
+      if (err === 'already_marked') return showFail('⚠', 'Уже отмечен', 'Вы уже отметились на этом занятии.', { errorCode: err });
+      if (err === 'out_of_radius') return showFail('📍', 'Вы не в аудитории', 'Система определила, что вы вне аудитории.', { errorCode: err });
+      if (err === 'geolocation required') return showFail('📍', 'Нужна геолокация', 'Разрешите доступ к геопозиции и попробуйте снова.', { errorCode: err });
+      if (err === 'qr_forward_blocked') return showFail('⏱', 'Код уже использован', 'Этот QR уже привязан к другому устройству. Дождитесь нового QR и сканируйте снова.', { tagText: 'Отсканируйте новый QR', errorCode: err });
+      if (err === 'qr_code_overused') return showFail('⏱', 'Код перегружен', 'Этим кодом уже отметилось много устройств. Дождитесь обновления QR на экране и отсканируйте заново.', { tagText: 'Отсканируйте новый QR', errorCode: err });
+      if (err === 'session already ended') return showFail('✕', 'Сессия завершена', 'Преподаватель уже завершил эту сессию.', { errorCode: err });
+      if (response.status === 429 || data.error === 'too_many_requests') return showFail('⏱', 'Слишком много запросов', 'Подождите минуту и отсканируйте QR снова.', { errorCode: 'rate_limited' });
+      return showFail('✕', 'Ошибка', 'Не удалось пройти проверку. Отсканируйте QR-код заново.', { tagText: 'Попробуйте ещё раз', errorCode: err });
     }
     showStudentForm(data.session, data.oneTimeToken, fp);
   } catch (e) {
