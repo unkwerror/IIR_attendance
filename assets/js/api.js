@@ -8,7 +8,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 0;
 const RETRY_DELAY_MS = 1500;
 const CHECK_TIMEOUT_MS = 20_000;
-const ATTENDANCE_TIMEOUT_MS = 12_000;
+/** POST /api/attendances may wait on Google Sheets; keep above worst-case Lambda tail. */
+const ATTENDANCE_TIMEOUT_MS = 35_000;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

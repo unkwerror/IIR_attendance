@@ -136,7 +136,7 @@ router.post('/api/attendances', async (req, res) => {
       client.release();
     }
   } catch (e) {
-    console.error('attendance error', e);
+    console.error('[attendances] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });

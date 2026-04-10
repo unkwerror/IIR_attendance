@@ -82,7 +82,7 @@ router.post('/api/sessions', async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('create session error', e);
+    console.error('[sessions/create] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -117,7 +117,7 @@ router.post('/api/sessions/:id/qr-token', async (req, res) => {
     );
     res.status(201).json({ token, expiresAt: expiresAt.toISOString() });
   } catch (e) {
-    console.error('qr-token error', e);
+    console.error('[sessions/qr-token] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -144,7 +144,7 @@ router.get('/api/sessions/:id/attendances', async (req, res) => {
     })) : [];
     res.json({ count: items.length, items });
   } catch (e) {
-    console.error('list attendances error', e);
+    console.error('[sessions/attendances] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -180,7 +180,7 @@ router.get('/api/sessions/:id/attendances/csv', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(header + lines);
   } catch (e) {
-    console.error('csv export error', e);
+    console.error('[sessions/csv] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -232,7 +232,7 @@ router.get('/api/sessions/:id/stats', async (req, res) => {
       timeline
     });
   } catch (e) {
-    console.error('session stats error', e);
+    console.error('[sessions/stats] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -264,7 +264,7 @@ router.post('/api/sessions/:id/end', async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('end session error', e);
+    console.error('[sessions/end] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });

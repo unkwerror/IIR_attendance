@@ -44,6 +44,22 @@ router.post('/api/check', async (req, res) => {
     const session = joined[0];
     if (!session) return res.status(404).json({ error: 'session not found' });
     if (session.ended_at) return res.status(400).json({ error: 'session already ended' });
+
+    {
+      const lookupDeviceId = devId || '';
+      const { rows: markedRows } = await pool.query(
+        `select 1 from attendances
+         where session_id = $1
+           and (fingerprint = $2 or ($3 <> '' and device_id = $3))
+         limit 1`,
+        [sessionId, fingerprint, lookupDeviceId]
+      );
+      if (markedRows.length > 0) {
+        console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
+        return res.status(403).json({ error: 'already_marked' });
+      }
+    }
+
     if (!session.qr_token) return res.status(400).json({ error: 'invalid token' });
     if (new Date() > session.qr_expires_at) return res.status(400).json({ error: 'token expired' });
 
@@ -71,19 +87,13 @@ router.post('/api/check', async (req, res) => {
     {
       const { rows: preRows } = await pool.query(
         `select
-           (select 1 from attendances where session_id = $1
-              and (fingerprint = $2 or device_id = $3) limit 1) as marked,
            (select token from qr_tokens where session_id = $1
-              and parent_qr_token = $4 and fingerprint = $2
+              and parent_qr_token = $3 and fingerprint = $2
               and is_one_time = true and expires_at > now()
             order by expires_at desc limit 1) as ott`,
-        [sessionId, fingerprint, devId || '', token]
+        [sessionId, fingerprint, token]
       );
 
-      if (session.fingerprint_required && preRows[0]?.marked) {
-        console.log(JSON.stringify({ event: 'check_rejected', reason: 'already_marked', sessionId, fp: fpShort(fingerprint), devId, ip, ts: new Date().toISOString() }));
-        return res.status(403).json({ error: 'already_marked' });
-      }
       if (preRows[0]?.ott) {
         return res.json({ ok: true, oneTimeToken: preRows[0].ott, session: { id: session.id, subject: session.subject } });
       }
@@ -122,7 +132,7 @@ router.post('/api/check', async (req, res) => {
 
     res.json({ ok: true, oneTimeToken: issuedToken, session: { id: session.id, subject: session.subject } });
   } catch (e) {
-    console.error('check error', e);
+    console.error('[check] error:', e.message || e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
