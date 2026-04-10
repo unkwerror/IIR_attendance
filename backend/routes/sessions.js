@@ -108,8 +108,12 @@ router.post('/api/sessions/:id/qr-token', async (req, res) => {
     const totalTtlSec = lifetimeSec + (config.qrTokenGraceSec || 0);
     const expiresAt = new Date(Date.now() + totalTtlSec * 1000);
     await pool.query(
-      `insert into qr_tokens (token, session_id, expires_at, is_one_time) values ($1,$2,$3,false)`,
-      [token, id, expiresAt]
+      `with deleted as (
+         delete from qr_tokens where session_id = $1 and is_one_time = false
+       )
+       insert into qr_tokens (token, session_id, expires_at, is_one_time)
+       values ($2, $1, $3, false)`,
+      [id, token, expiresAt]
     );
     res.status(201).json({ token, expiresAt: expiresAt.toISOString() });
   } catch (e) {

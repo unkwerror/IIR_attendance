@@ -67,3 +67,5 @@ create unique index if not exists uq_qr_tokens_session_parent_fingerprint
   on qr_tokens(session_id, parent_qr_token, fingerprint)
   where is_one_time = true and parent_qr_token is not null;
 
+-- Policy (enforced in app): only one active non-one-time QR per session — new rotation deletes previous session QR rows (is_one_time = false) before insert.
+
